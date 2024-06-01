@@ -39,13 +39,13 @@ def root():
 
 
 @app.get("/generate")
-def generate_data(size: int = 1_000_000):
+def generate_data(size: int = 1_000):
     fake = Faker()
     fake.seed(42)
 
     # Generate data for Aluno
     data = []
-    for _id in range(1000):
+    for _id in range(10_000):
         data.append(
             {
                 "id": _id + 1,
@@ -58,8 +58,8 @@ def generate_data(size: int = 1_000_000):
 
     # Generate data for Estacionamento
     data = [
-        {"id": 1, "name": "Estacionamento 1", "capacidade": 100},
-        {"id": 2, "name": "Estacionamento 2", "capacidade": 200},
+        {"id": 1, "name": "Estacionamento 1", "capacidade": 200},
+        {"id": 2, "name": "Estacionamento 2", "capacidade": 150},
     ]
 
     pd.DataFrame(data).to_parquet("data/estacionamento.parquet", compression="snappy")
@@ -90,19 +90,15 @@ def generate_data(size: int = 1_000_000):
     registered_student = {}
 
     init_datetime = datetime.fromisoformat(date.today().isoformat())
-    last_id = 0
     for _id in range(size):
-        aluno_id = fake.random_int(min=1, max=1000)
+        aluno_id = fake.random_int(min=1, max=10_000)
         catraca_id = choice([1, 3])
-        while aluno_id == last_id:
-            aluno_id = fake.random_int(min=1, max=1000)
-
         ts_entrada = init_datetime
-        ts_saida = init_datetime + timedelta(minutes=fake.random_int(min=1, max=60))
+        ts_saida = init_datetime + timedelta(seconds=fake.random_int(min=60, max=60*60))
 
-        if registered_student.get(aluno_id, ts_saida) < ts_saida:
+        if registered_student.get(aluno_id, ts_saida) < ts_entrada:
             ts_entrada = registered_student[aluno_id] + timedelta(
-                seconds=fake.random_int(min=15 * 60, max=60 * 60)
+                seconds=fake.random_int(min=10 * 60, max=60 * 60)
             )
             ts_saida = ts_entrada + timedelta(
                 seconds=fake.random_int(min=60, max=60 * 60)
@@ -123,29 +119,29 @@ def generate_data(size: int = 1_000_000):
 
         data.append(entrada)
         data.append(saida)
-        init_datetime += timedelta(minutes=5)
+        init_datetime += timedelta(seconds=fake.random_int(min=0, max=60*30))
 
     pd.DataFrame(data).to_parquet("data/registro.parquet", compression="snappy")
 
     return {"message": "Data generated successfully"}
 
 
-@app.get("/aluno/")
+@app.get("/aluno")
 def get_aluno():
     return pd.read_parquet("./data/aluno.parquet").to_dict("records")
 
 
-@app.get("/estacionamento/")
+@app.get("/estacionamento")
 def get_estacionamento():
     return pd.read_parquet("./data/estacionamento.parquet").to_dict("records")
 
 
-@app.get("/catraca/")
+@app.get("/catraca")
 def get_catraca():
     return pd.read_parquet("./data/catraca.parquet").to_dict("records")
 
 
-@app.get("/entry/")
+@app.get("/registro")
 def get_entry(
     from_timestamp: datetime = date.today(),
     to_timestamp: datetime = datetime.now(),
@@ -153,11 +149,12 @@ def get_entry(
     return get_entry_filtered(None, from_timestamp, to_timestamp)
 
 
-@app.get("/entry/{estacionamento_id}")
+@app.get("/registro/{estacionamento_id}")
 def get_entry_filtered(
     estacionamento_id: int,
     from_timestamp: datetime = date.today(),
     to_timestamp: datetime = datetime.now(),
+    ascending: bool = True,
 ):
     catraca_df = pd.read_parquet("./data/catraca.parquet")
     if estacionamento_id:
@@ -168,17 +165,19 @@ def get_entry_filtered(
         .query("catraca_id in @catraca_df.id")
         .query("timestamp <= @to_timestamp")
         .query("timestamp >= @from_timestamp")
-        .sort_values("timestamp", ascending=False)
+        .sort_values("timestamp", ascending=ascending)
         .to_dict("records")
     )
 
+
+WEBSERVER_PORT = 8000
 
 if __name__ == "__main__":
     import uvicorn
 
     uvicorn.run(
         'main:app',
-        port=8000,
+        port=WEBSERVER_PORT,
         reload=True,
         reload_dirs=["src"],
         reload_delay=2.0,
