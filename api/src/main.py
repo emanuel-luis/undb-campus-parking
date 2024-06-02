@@ -1,10 +1,17 @@
 from fastapi import FastAPI
 from datetime import datetime, date
+from fastapi.middleware.cors import CORSMiddleware
 import pandas as pd
 import requests
 
 
 app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.get("/vagas/{estacionamento_id}")

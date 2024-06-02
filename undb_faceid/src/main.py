@@ -2,6 +2,7 @@ from datetime import datetime, date, timedelta
 import pandas as pd
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from pathlib import Path
 
 from random import choice
@@ -10,6 +11,12 @@ from datetime import datetime, timedelta
 
 curdir = Path(__file__).parent
 app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 data_dir = curdir.parent / "data"
 
 @app.get("/")
