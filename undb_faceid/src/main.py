@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 
 curdir = Path(__file__).parent
 app = FastAPI()
-
+data_dir = curdir.parent / "data"
 
 @app.get("/")
 def root():
@@ -54,7 +54,7 @@ def generate_data(size: int = 1_000):
             }
         )
 
-    pd.DataFrame(data).to_parquet("data/aluno.parquet", compression="snappy")
+    pd.DataFrame(data).to_parquet(data_dir / "aluno.parquet", compression="snappy")
 
     # Generate data for Estacionamento
     data = [
@@ -62,7 +62,7 @@ def generate_data(size: int = 1_000):
         {"id": 2, "name": "Estacionamento 2", "capacidade": 150},
     ]
 
-    pd.DataFrame(data).to_parquet("data/estacionamento.parquet", compression="snappy")
+    pd.DataFrame(data).to_parquet(data_dir / "estacionamento.parquet", compression="snappy")
 
     # Generate data for Catraca
     data = [
@@ -82,7 +82,7 @@ def generate_data(size: int = 1_000):
         {"id": 4, "name": "Catraca 4", "estacionamento_id": 2, "tipo_catraca": "saida"},
     ]
 
-    pd.DataFrame(data).to_parquet("data/catraca.parquet", compression="snappy")
+    pd.DataFrame(data).to_parquet(data_dir / "catraca.parquet", compression="snappy")
 
     # Generate data for Registro
     data = []
@@ -121,24 +121,24 @@ def generate_data(size: int = 1_000):
         data.append(saida)
         init_datetime += timedelta(seconds=fake.random_int(min=0, max=60*30))
 
-    pd.DataFrame(data).to_parquet("data/registro.parquet", compression="snappy")
+    pd.DataFrame(data).to_parquet(data_dir / "registro.parquet", compression="snappy")
 
     return {"message": "Data generated successfully"}
 
 
 @app.get("/aluno")
 def get_aluno():
-    return pd.read_parquet("./data/aluno.parquet").to_dict("records")
+    return pd.read_parquet(data_dir / "aluno.parquet").to_dict("records")
 
 
 @app.get("/estacionamento")
 def get_estacionamento():
-    return pd.read_parquet("./data/estacionamento.parquet").to_dict("records")
+    return pd.read_parquet(data_dir / "estacionamento.parquet").to_dict("records")
 
 
 @app.get("/catraca")
 def get_catraca():
-    return pd.read_parquet("./data/catraca.parquet").to_dict("records")
+    return pd.read_parquet(data_dir / "catraca.parquet").to_dict("records")
 
 
 @app.get("/registro")
@@ -156,12 +156,12 @@ def get_entry_filtered(
     to_timestamp: datetime = datetime.now(),
     ascending: bool = True,
 ):
-    catraca_df = pd.read_parquet("./data/catraca.parquet")
+    catraca_df = pd.read_parquet(data_dir / "catraca.parquet")
     if estacionamento_id:
         catraca_df.query("estacionamento_id == @estacionamento_id", inplace=True)
 
     return (
-        pd.read_parquet("./data/registro.parquet")
+        pd.read_parquet(data_dir / "registro.parquet")
         .query("catraca_id in @catraca_df.id")
         .query("timestamp <= @to_timestamp")
         .query("timestamp >= @from_timestamp")
