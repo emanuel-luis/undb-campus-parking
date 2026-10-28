@@ -1,5 +1,6 @@
+import asyncio
 from collections.abc import Callable
-from typing import Any
+from typing import Any, Self
 
 import httpx
 import pytest
@@ -96,3 +97,28 @@ async def test_cors_refuses_other_methods(client: httpx.AsyncClient, method: str
         "/healthz", headers={"Origin": ORIGIN, "Access-Control-Request-Method": method}
     )
     assert r.status_code == 400
+
+
+class _SlowEngine:
+    def connect(self) -> "_SlowEngine":
+        return self
+
+    async def __aenter__(self) -> Self:
+        await asyncio.sleep(5)
+        return self
+
+    async def __aexit__(self, *exc: object) -> None:
+        return None
+
+
+async def test_readyz_times_out_on_hung_database(client_for: Callable[[FastAPI], Any]) -> None:
+    app = create_app(make_settings(readiness_timeout_s=0.05))
+    async with client_for(app) as c:
+        real = app.state.engine
+        app.state.engine = _SlowEngine()
+        try:
+            r = await c.get("/readyz")
+        finally:
+            app.state.engine = real
+    assert r.status_code == 503
+    assert r.json()["code"] == "database-unavailable"

@@ -37,7 +37,9 @@ def test_secret_not_in_repr() -> None:
 def test_prod_requires_all_keys() -> None:
     with pytest.raises(ValidationError, match="prod requires"):
         build(env="prod", ingest_api_key=KEY)
-    ok = build(env="prod", ingest_api_key=KEY, admin_api_key=KEY, operator_api_key=KEY)
+    ok = build(
+        env="prod", ingest_api_key="i" * 32, admin_api_key="a" * 32, operator_api_key="o" * 32
+    )
     assert ok.env == "prod"
 
 
@@ -46,9 +48,9 @@ def test_prod_rejects_sqlite() -> None:
         build(
             env="prod",
             database_url="sqlite+aiosqlite:///x.db",
-            ingest_api_key=KEY,
-            admin_api_key=KEY,
-            operator_api_key=KEY,
+            ingest_api_key="i" * 32,
+            admin_api_key="a" * 32,
+            operator_api_key="o" * 32,
         )
 
 
@@ -68,3 +70,23 @@ def test_env_prefix(monkeypatch: pytest.MonkeyPatch) -> None:
         assert s.cors_origins == ["http://a.test"]
     finally:
         get_settings.cache_clear()
+
+
+def test_prod_rejects_placeholder_keys() -> None:
+    placeholder = "change-me-to-a-random-32+-char-key"
+    with pytest.raises(ValidationError, match="placeholders"):
+        build(
+            env="prod",
+            ingest_api_key=placeholder,
+            admin_api_key="a" * 32,
+            operator_api_key="o" * 32,
+        )
+
+
+def test_prod_requires_distinct_keys() -> None:
+    with pytest.raises(ValidationError, match="must all differ"):
+        build(env="prod", ingest_api_key=KEY, admin_api_key=KEY, operator_api_key="o" * 32)
+    ok = build(
+        env="prod", ingest_api_key="i" * 32, admin_api_key="a" * 32, operator_api_key="o" * 32
+    )
+    assert ok.env == "prod"

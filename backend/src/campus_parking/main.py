@@ -9,7 +9,11 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from campus_parking.core import health, metrics
 from campus_parking.core.db import create_engine, create_sessionmaker
-from campus_parking.core.middleware import MetricsMiddleware, RequestIdMiddleware
+from campus_parking.core.middleware import (
+    MetricsMiddleware,
+    RequestIdMiddleware,
+    UnhandledErrorMiddleware,
+)
 from campus_parking.core.problems import register_problem_handlers
 from campus_parking.core.settings import Settings, get_settings
 
@@ -33,7 +37,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.engine = create_engine(settings)
         app.state.sessionmaker = create_sessionmaker(app.state.engine)
-        app.state.draining = False
         try:
             yield
         finally:
@@ -45,6 +48,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.draining = False
 
     # The last middleware added is the outermost one.
+    app.add_middleware(UnhandledErrorMiddleware)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,

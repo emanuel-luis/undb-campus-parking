@@ -7,6 +7,7 @@ import pytest
 from fastapi import FastAPI
 
 from campus_parking.core.problems import DomainError, Unauthorized
+from tests.conftest import ORIGIN
 
 
 @pytest.fixture
@@ -102,3 +103,9 @@ async def test_access_log_line(client: httpx.AsyncClient, caplog: pytest.LogCapt
     rec = next(r for r in caplog.records if r.name == "campus_parking.access")
     assert (rec.method, rec.route, rec.status) == ("GET", "/healthz", 200)  # type: ignore[attr-defined]
     assert rec.duration_ms >= 0  # type: ignore[attr-defined]
+
+
+async def test_500_carries_cors_and_request_id(client: httpx.AsyncClient) -> None:
+    r = await client.get("/t/boom", headers={"Origin": ORIGIN})
+    assert_problem(r, 500, "internal-error")
+    assert r.headers["access-control-allow-origin"] == ORIGIN

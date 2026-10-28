@@ -140,7 +140,7 @@ async def _http_exception(request: Request, exc: Exception) -> JSONResponse:
     )
 
 
-async def _unhandled(request: Request, exc: Exception) -> JSONResponse:
+async def unhandled_response(request: Request, exc: Exception) -> JSONResponse:
     logger.error(
         "unhandled exception",
         exc_info=exc,
@@ -159,4 +159,4 @@ def register_problem_handlers(app: FastAPI) -> None:
     app.add_exception_handler(DomainError, _domain_error)
     app.add_exception_handler(RequestValidationError, _validation_error)
     app.add_exception_handler(StarletteHTTPException, _http_exception)
-    app.add_exception_handler(Exception, _unhandled)
+    app.add_exception_handler(Exception, unhandled_response)

@@ -1,8 +1,10 @@
 import json
+import signal
 from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
+import uvicorn
 from sqlalchemy import Column, Integer, MetaData, Table, insert, select, text
 from sqlalchemy.exc import StatementError
 from sqlalchemy.ext.asyncio import create_async_engine
@@ -35,17 +37,32 @@ def test_openapi_file(tmp_path: Path) -> None:
     assert json.loads(target.read_text(encoding="utf-8"))["openapi"].startswith("3.")
 
 
-def test_serve_passes_options(monkeypatch: pytest.MonkeyPatch) -> None:
-    import uvicorn
-
-    seen: dict[str, object] = {}
-    monkeypatch.setattr(uvicorn, "run", lambda app, **kw: seen.update(app=app, **kw))
+def test_serve_builds_config_and_runs_draining_server(monkeypatch: pytest.MonkeyPatch) -> None:
+    ran: list[cli.DrainingServer] = []
+    monkeypatch.setattr(cli, "configure_logging", lambda settings: None)
+    monkeypatch.setattr(cli.DrainingServer, "run", lambda self: ran.append(self))
     assert cli.main(["serve", "--host", "0.0.0.0", "--port", "9000"]) == 0
-    assert seen["factory"] is True
-    assert seen["app"] == "campus_parking.main:create_app"
-    assert seen["port"] == 9000
-    assert seen["timeout_graceful_shutdown"] == 15
-    assert seen["access_log"] is False
+    (server,) = ran
+    assert server.config.port == 9000
+    assert server.config.timeout_graceful_shutdown == 15
+    assert server.config.access_log is False
+    assert server.config.app is server.parking_app
+
+
+async def test_handle_exit_flips_draining_and_readyz_503(client_for) -> None:  # type: ignore[no-untyped-def]
+    from campus_parking.main import create_app
+    from tests.conftest import make_settings
+
+    app = create_app(make_settings())
+    server = cli.DrainingServer(uvicorn.Config(app), app)
+    async with client_for(app) as c:
+        assert (await c.get("/readyz")).status_code == 200
+        server.handle_exit(signal.SIGTERM, None)
+        assert app.state.draining is True
+        assert server.should_exit is True
+        r = await c.get("/readyz")
+    assert r.status_code == 503
+    assert r.json()["code"] == "service-draining"
 
 
 def test_naming_convention_applies() -> None:

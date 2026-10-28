@@ -7,10 +7,12 @@ import uuid
 from typing import Any
 
 from starlette.datastructures import Headers, MutableHeaders
+from starlette.requests import Request
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from campus_parking.core import logging as app_logging
 from campus_parking.core.metrics import http_request_duration_seconds
+from campus_parking.core.problems import unhandled_response
 
 logger = logging.getLogger("campus_parking.access")
 
@@ -85,3 +87,31 @@ class MetricsMiddleware:
             http_request_duration_seconds.labels(
                 scope["method"], route_template(scope), str(status)
             ).observe(time.perf_counter() - started)
+
+
+class UnhandledErrorMiddleware:
+    """Innermost middleware: turns an unhandled exception into the 500 problem response here, so
+    CORS and request-id headers still apply. ServerErrorMiddleware stays the last resort."""
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        started = False
+
+        async def send_wrapper(message: Message) -> None:
+            nonlocal started
+            if message["type"] == "http.response.start":
+                started = True
+            await send(message)
+
+        try:
+            await self.app(scope, receive, send_wrapper)
+        except Exception as exc:
+            if started:
+                raise
+            response = await unhandled_response(Request(scope), exc)
+            await response(scope, receive, send)

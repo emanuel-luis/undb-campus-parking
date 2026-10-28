@@ -5,31 +5,46 @@ import json
 import sys
 from collections.abc import Callable, Sequence
 from pathlib import Path
+from types import FrameType
+
+import uvicorn
+from fastapi import FastAPI
 
 from campus_parking.core.logging import configure_logging
 from campus_parking.core.settings import get_settings
+from campus_parking.main import create_app
+
+
+class DrainingServer(uvicorn.Server):
+    """Flips the app's draining flag on the first signal, so /readyz answers 503 while uvicorn
+    still closes the listener and waits for connections (the lifespan only runs after that)."""
+
+    def __init__(self, config: uvicorn.Config, app: FastAPI) -> None:
+        super().__init__(config)
+        self.parking_app = app
+
+    def handle_exit(self, sig: int, frame: FrameType | None) -> None:
+        self.parking_app.state.draining = True
+        super().handle_exit(sig, frame)
 
 
 def _serve(args: argparse.Namespace) -> int:
-    import uvicorn
-
     settings = get_settings()
     configure_logging(settings)
-    uvicorn.run(
-        "campus_parking.main:create_app",
-        factory=True,
+    app = create_app(settings)
+    config = uvicorn.Config(
+        app,
         host=args.host,
         port=args.port,
         timeout_graceful_shutdown=15,
         access_log=False,
         log_config=None,
     )
+    DrainingServer(config, app).run()
     return 0
 
 
 def _openapi(args: argparse.Namespace) -> int:
-    from campus_parking.main import create_app
-
     schema = create_app().openapi()
     text = json.dumps(schema, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
     if args.output:

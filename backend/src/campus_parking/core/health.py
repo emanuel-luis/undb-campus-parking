@@ -1,5 +1,6 @@
 """Liveness and readiness probes."""
 
+import asyncio
 from typing import Literal
 
 from fastapi import APIRouter, Request
@@ -35,8 +36,9 @@ async def readyz(request: Request) -> Readiness:
     if request.app.state.draining:
         raise ServiceDraining()
     try:
-        async with request.app.state.engine.connect() as conn:
-            await conn.execute(text("SELECT 1"))
-    except (SQLAlchemyError, OSError) as exc:
+        async with asyncio.timeout(request.app.state.settings.readiness_timeout_s):
+            async with request.app.state.engine.connect() as conn:
+                await conn.execute(text("SELECT 1"))
+    except (SQLAlchemyError, OSError, TimeoutError) as exc:
         raise DatabaseUnavailable() from exc
     return Readiness()

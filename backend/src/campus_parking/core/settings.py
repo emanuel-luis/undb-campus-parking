@@ -10,6 +10,7 @@ from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 MIN_KEY_LENGTH = 32
+_KEY_FIELDS = ("ingest_api_key", "admin_api_key", "operator_api_key")
 
 
 class Settings(BaseSettings):
@@ -49,6 +50,9 @@ class Settings(BaseSettings):
     worker_poll_s: float = Field(2.0, gt=0)
     worker_metrics_port: int = Field(9100, gt=0, lt=65536)
 
+    # Readiness probe: give up on the database check after this many seconds.
+    readiness_timeout_s: float = Field(2.0, gt=0)
+
     @field_validator("timezone")
     @classmethod
     def _known_timezone(cls, value: str) -> str:
@@ -70,13 +74,14 @@ class Settings(BaseSettings):
         if self.env != "dev" and "*" in self.cors_origins:
             raise ValueError("cors_origins may contain '*' only when env is dev")
         if self.env == "prod":
-            missing = [
-                name
-                for name in ("ingest_api_key", "admin_api_key", "operator_api_key")
-                if getattr(self, name) is None
-            ]
+            missing = [name for name in _KEY_FIELDS if getattr(self, name) is None]
             if missing:
                 raise ValueError(f"prod requires: {', '.join(missing)}")
+            keys = [getattr(self, name).get_secret_value() for name in _KEY_FIELDS]
+            if any(key.startswith("change-me") for key in keys):
+                raise ValueError("prod API keys must not be the .env.example placeholders")
+            if len(set(keys)) != len(keys):
+                raise ValueError("prod API keys must all differ")
             if self.database_url.startswith("sqlite"):
                 raise ValueError("a SQLite database_url is not allowed in prod")
         return self
