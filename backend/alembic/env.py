@@ -10,6 +10,8 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from alembic import context
 from campus_parking.core.db import Base
 from campus_parking.core.settings import Settings
+from campus_parking.ingestion import models as ingestion_models  # noqa: F401  (registers tables)
+from campus_parking.occupancy import models as occupancy_models  # noqa: F401  (registers tables)
 from campus_parking.registry import models as registry_models  # noqa: F401  (registers tables)
 
 config = context.config
@@ -44,7 +46,7 @@ def _run(connection: Connection) -> None:
 
 
 async def run_migrations_online() -> None:
-    engine = create_async_engine(_url(), poolclass=pool.NullPool)
+    engine = create_async_engine(_url(), poolclass=pool.NullPool, hide_parameters=True)
     async with engine.connect() as connection:
         await connection.run_sync(_run)
     await engine.dispose()

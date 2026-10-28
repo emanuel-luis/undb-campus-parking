@@ -1,6 +1,29 @@
 {
   "components": {
     "schemas": {
+      "AvailabilitySnapshot": {
+        "properties": {
+          "generated_at": {
+            "format": "date-time",
+            "title": "Generated At",
+            "type": "string"
+          },
+          "lots": {
+            "description": "Sorted by lot_id.",
+            "items": {
+              "$ref": "#/components/schemas/LotAvailability"
+            },
+            "title": "Lots",
+            "type": "array"
+          }
+        },
+        "required": [
+          "generated_at",
+          "lots"
+        ],
+        "title": "AvailabilitySnapshot",
+        "type": "object"
+      },
       "BulkUpsertResult": {
         "properties": {
           "created": {
@@ -38,6 +61,104 @@
           "capacity"
         ],
         "title": "CapacityPeriod",
+        "type": "object"
+      },
+      "GateEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "direction": {
+            "enum": [
+              "entry",
+              "exit"
+            ],
+            "title": "Direction",
+            "type": "string"
+          },
+          "event_id": {
+            "format": "uuid",
+            "title": "Event Id",
+            "type": "string"
+          },
+          "gate_id": {
+            "pattern": "^[a-z0-9-]{2,40}$",
+            "title": "Gate Id",
+            "type": "string"
+          },
+          "lot_id": {
+            "pattern": "^[a-z0-9-]{2,40}$",
+            "title": "Lot Id",
+            "type": "string"
+          },
+          "occurred_at": {
+            "format": "date-time",
+            "title": "Occurred At",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": 1,
+            "title": "Schema Version",
+            "type": "integer"
+          },
+          "student_ref": {
+            "pattern": "^stu_[0-9a-f]{12}$",
+            "title": "Student Ref",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_version",
+          "event_id",
+          "gate_id",
+          "lot_id",
+          "direction",
+          "student_ref",
+          "occurred_at"
+        ],
+        "title": "GateEvent",
+        "type": "object"
+      },
+      "GateHealth": {
+        "properties": {
+          "gate_id": {
+            "title": "Gate Id",
+            "type": "string"
+          },
+          "last_event_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Event At"
+          },
+          "last_received_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Received At"
+          },
+          "lot_id": {
+            "title": "Lot Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "gate_id",
+          "lot_id",
+          "last_event_at",
+          "last_received_at"
+        ],
+        "title": "GateHealth",
         "type": "object"
       },
       "GateOut": {
@@ -117,6 +238,225 @@
         "title": "HealthStatus",
         "type": "object"
       },
+      "IngestResult": {
+        "properties": {
+          "accepted": {
+            "title": "Accepted",
+            "type": "integer"
+          },
+          "batch_id": {
+            "format": "uuid",
+            "title": "Batch Id",
+            "type": "string"
+          },
+          "duplicates": {
+            "title": "Duplicates",
+            "type": "integer"
+          },
+          "received": {
+            "title": "Received",
+            "type": "integer"
+          },
+          "rejected": {
+            "title": "Rejected",
+            "type": "integer"
+          },
+          "rejects": {
+            "items": {
+              "$ref": "#/components/schemas/RejectItem"
+            },
+            "title": "Rejects",
+            "type": "array"
+          }
+        },
+        "required": [
+          "batch_id",
+          "received",
+          "accepted",
+          "duplicates",
+          "rejected",
+          "rejects"
+        ],
+        "title": "IngestResult",
+        "type": "object"
+      },
+      "IngestionHealth": {
+        "properties": {
+          "gates": {
+            "items": {
+              "$ref": "#/components/schemas/GateHealth"
+            },
+            "title": "Gates",
+            "type": "array"
+          },
+          "lag": {
+            "$ref": "#/components/schemas/Lag",
+            "description": "Arrival lag of accepted events in the window."
+          },
+          "last_batch_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Batch At"
+          },
+          "per_minute": {
+            "description": "Minutes with at least one batch, oldest first.",
+            "items": {
+              "$ref": "#/components/schemas/MinuteCount"
+            },
+            "title": "Per Minute",
+            "type": "array"
+          },
+          "rejects_by_reason": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Rejects By Reason",
+            "type": "object"
+          }
+        },
+        "required": [
+          "per_minute",
+          "rejects_by_reason",
+          "lag",
+          "gates",
+          "last_batch_at"
+        ],
+        "title": "IngestionHealth",
+        "type": "object"
+      },
+      "Lag": {
+        "properties": {
+          "avg_s": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg S"
+          },
+          "max_s": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max S"
+          }
+        },
+        "required": [
+          "avg_s",
+          "max_s"
+        ],
+        "title": "Lag",
+        "type": "object"
+      },
+      "LotAvailability": {
+        "properties": {
+          "capacity": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Current capacity; null before the first period starts.",
+            "title": "Capacity"
+          },
+          "free": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "max(capacity - occupied, 0); null without a capacity.",
+            "title": "Free"
+          },
+          "last_event_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Event At"
+          },
+          "lot_id": {
+            "pattern": "^[a-z0-9-]{2,40}$",
+            "title": "Lot Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "occupancy_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "occupied / capacity, in percent, 1 decimal.",
+            "title": "Occupancy Pct"
+          },
+          "occupied": {
+            "description": "Open stays, exact (may exceed capacity).",
+            "title": "Occupied",
+            "type": "integer"
+          },
+          "over_capacity": {
+            "title": "Over Capacity",
+            "type": "boolean"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "version": {
+            "description": "Increases whenever an accepted event changes the lot.",
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "lot_id",
+          "name",
+          "capacity",
+          "occupied",
+          "free",
+          "occupancy_pct",
+          "over_capacity",
+          "version",
+          "updated_at",
+          "last_event_at"
+        ],
+        "title": "LotAvailability",
+        "type": "object"
+      },
       "LotOut": {
         "properties": {
           "capacity": {
@@ -191,6 +531,35 @@
           "capacity_history"
         ],
         "title": "LotUpsert",
+        "type": "object"
+      },
+      "MinuteCount": {
+        "properties": {
+          "accepted": {
+            "title": "Accepted",
+            "type": "integer"
+          },
+          "duplicates": {
+            "title": "Duplicates",
+            "type": "integer"
+          },
+          "minute": {
+            "format": "date-time",
+            "title": "Minute",
+            "type": "string"
+          },
+          "rejected": {
+            "title": "Rejected",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "minute",
+          "accepted",
+          "duplicates",
+          "rejected"
+        ],
+        "title": "MinuteCount",
         "type": "object"
       },
       "Problem": {
@@ -273,6 +642,181 @@
           }
         },
         "title": "Readiness",
+        "type": "object"
+      },
+      "RejectItem": {
+        "properties": {
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "event_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event Id"
+          },
+          "index": {
+            "description": "Position of the item in the request array.",
+            "title": "Index",
+            "type": "integer"
+          },
+          "reason": {
+            "enum": [
+              "schema_invalid",
+              "unknown_gate",
+              "unknown_student",
+              "lot_mismatch",
+              "direction_mismatch",
+              "in_future",
+              "too_old",
+              "event_id_conflict"
+            ],
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "index",
+          "reason",
+          "detail"
+        ],
+        "title": "RejectItem",
+        "type": "object"
+      },
+      "RejectOut": {
+        "properties": {
+          "batch_id": {
+            "format": "uuid",
+            "title": "Batch Id",
+            "type": "string"
+          },
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "event_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event Id"
+          },
+          "gate_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gate Id"
+          },
+          "lot_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lot Id"
+          },
+          "payload": {
+            "description": "The item as received, capped at 4 KB.",
+            "title": "Payload"
+          },
+          "reason": {
+            "enum": [
+              "schema_invalid",
+              "unknown_gate",
+              "unknown_student",
+              "lot_mismatch",
+              "direction_mismatch",
+              "in_future",
+              "too_old",
+              "event_id_conflict"
+            ],
+            "title": "Reason",
+            "type": "string"
+          },
+          "received_at": {
+            "format": "date-time",
+            "title": "Received At",
+            "type": "string"
+          },
+          "reject_id": {
+            "title": "Reject Id",
+            "type": "integer"
+          },
+          "service_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Service Date"
+          }
+        },
+        "required": [
+          "reject_id",
+          "batch_id",
+          "received_at",
+          "event_id",
+          "service_date",
+          "lot_id",
+          "gate_id",
+          "reason",
+          "detail",
+          "payload"
+        ],
+        "title": "RejectOut",
+        "type": "object"
+      },
+      "RejectPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RejectOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Pass as `cursor` for the next page; null at the end.",
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "title": "RejectPage",
         "type": "object"
       },
       "StudentBulkUpsert": {
@@ -546,6 +1090,109 @@
         ]
       }
     },
+    "/api/v1/availability": {
+      "get": {
+        "operationId": "availability_api_v1_availability_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AvailabilitySnapshot"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Availability of every lot",
+        "tags": [
+          "availability"
+        ]
+      }
+    },
+    "/api/v1/events": {
+      "post": {
+        "description": "A JSON array of 1 to 1000 GateEvent items. Whole-batch problems are 4xx/5xx; every item problem is listed in `rejects` of the 202 response and does not fail the batch. Safe to retry: the same event is a duplicate, never counted twice.",
+        "operationId": "post_events_api_v1_events_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "items": {
+                  "$ref": "#/components/schemas/GateEvent"
+                },
+                "maxItems": 1000,
+                "minItems": 1,
+                "type": "array"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IngestResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)."
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)."
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)."
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "summary": "Ingest a batch of gate events",
+        "tags": [
+          "ingestion"
+        ]
+      }
+    },
     "/api/v1/lots": {
       "get": {
         "operationId": "list_lots_api_v1_lots_get",
@@ -568,6 +1215,242 @@
         "summary": "List lots",
         "tags": [
           "lots"
+        ]
+      }
+    },
+    "/api/v1/lots/{lot_id}/availability": {
+      "get": {
+        "operationId": "lot_availability_api_v1_lots__lot_id__availability_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "lot_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[a-z0-9-]{2,40}$",
+              "title": "Lot Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LotAvailability"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Validation error (problem details)."
+          }
+        },
+        "summary": "Availability of one lot",
+        "tags": [
+          "availability"
+        ]
+      }
+    },
+    "/api/v1/operator/ingestion/health": {
+      "get": {
+        "description": "Batches per minute, rejects by reason, arrival lag and per-gate freshness.",
+        "operationId": "ingestion_health_api_v1_operator_ingestion_health_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "window_min",
+            "required": false,
+            "schema": {
+              "default": 60,
+              "maximum": 240,
+              "minimum": 1,
+              "title": "Window Min",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IngestionHealth"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)."
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "summary": "Ingestion health",
+        "tags": [
+          "operator"
+        ]
+      }
+    },
+    "/api/v1/operator/rejects": {
+      "get": {
+        "description": "Newest first. Pass `next_cursor` back as `cursor` for the next page.",
+        "operationId": "list_rejects_api_v1_operator_rejects_get",
+        "parameters": [
+          {
+            "description": "Only rejects received at or after this time.",
+            "in": "query",
+            "name": "since",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only rejects received at or after this time.",
+              "title": "Since"
+            }
+          },
+          {
+            "in": "query",
+            "name": "reason",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "schema_invalid",
+                    "unknown_gate",
+                    "unknown_student",
+                    "lot_mismatch",
+                    "direction_mismatch",
+                    "in_future",
+                    "too_old",
+                    "event_id_conflict"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Reason"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RejectPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)."
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "summary": "List rejected events",
+        "tags": [
+          "operator"
         ]
       }
     },
@@ -636,6 +1519,18 @@
     {
       "description": "Registry writes (admin API key).",
       "name": "admin"
+    },
+    {
+      "description": "Free spaces per lot, derived from gate events.",
+      "name": "availability"
+    },
+    {
+      "description": "Gate-event intake (ingest API key).",
+      "name": "ingestion"
+    },
+    {
+      "description": "Ingestion health and rejects (operator API key).",
+      "name": "operator"
     }
   ]
 }

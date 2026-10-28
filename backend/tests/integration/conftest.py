@@ -57,6 +57,15 @@ async def fetch_column(url: str, sql: str) -> list[str]:
         await engine.dispose()
 
 
+async def run_sql(url: str, sql: str) -> None:
+    engine = create_async_engine(url)
+    try:
+        async with engine.begin() as conn:
+            await conn.execute(text(sql))
+    finally:
+        await engine.dispose()
+
+
 def check_throwaway_database(url: str, app_url: str | None) -> None:
     """Refuse any database the suite could destroy by mistake: it must be named `*_test` and
     must not be the application database. Exits the run (a failure, not a skip)."""
