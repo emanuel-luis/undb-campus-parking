@@ -3,6 +3,7 @@
 import argparse
 import json
 import os
+import socket
 import sys
 from collections.abc import Callable, Sequence
 from pathlib import Path
@@ -29,6 +30,15 @@ class DrainingServer(uvicorn.Server):
     def handle_exit(self, sig: int, frame: FrameType | None) -> None:
         self.parking_app.state.draining = True
         super().handle_exit(sig, frame)
+
+    async def shutdown(self, sockets: list[socket.socket] | None = None) -> None:
+        """uvicorn closes every websocket with 1012 before the lifespan shutdown runs, so the
+        live sockets are told 1001 here, first."""
+        self.parking_app.state.draining = True
+        hub = getattr(self.parking_app.state, "hub", None)
+        if hub is not None:
+            await hub.close()
+        await super().shutdown(sockets)
 
 
 def _serve(args: argparse.Namespace) -> int:

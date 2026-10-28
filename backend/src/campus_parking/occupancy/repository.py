@@ -92,6 +92,11 @@ class OccupancyRepository:
                 )
             )
 
+    async def versions(self) -> dict[str, int]:
+        """(lot_id, version) of every counter row: the poller's one tiny change-detection query."""
+        stmt = select(LotOccupancy.lot_id, LotOccupancy.version)
+        return {lot_id: version for lot_id, version in (await self.session.execute(stmt))}
+
     async def availability_rows(self, lot_id: str | None = None) -> list[tuple[Lot, LotOccupancy]]:
         stmt = (
             select(Lot, LotOccupancy)
