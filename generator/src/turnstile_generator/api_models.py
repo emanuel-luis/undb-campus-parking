@@ -380,9 +380,12 @@ class ReportFreshness(BaseModel):
         UUID | None,
         Field(description='Latest successful warehouse run.', title='Last Run Id'),
     ]
-    mode: Annotated[str | None, Field(description='incremental or full.', title='Mode')]
+    mode: Annotated[
+        Literal['incremental', 'full'] | None,
+        Field(description='Mode of that run.', title='Mode'),
+    ]
     status: Annotated[
-        str | None,
+        Literal['queued', 'running', 'succeeded', 'failed'] | None,
         Field(
             description='Status of the most recent warehouse run of any outcome (queued, running, succeeded, failed): a failed refresh shows here while the data stays as of finished_at.',
             title='Status',
@@ -405,7 +408,7 @@ class RunRequest(BaseModel):
     service_date: Annotated[
         date | None,
         Field(
-            description='A past local date; defaults to yesterday in the service time zone.',
+            description='daily and close_day: a past local date, default yesterday. warehouse: today or a past date (it only labels the run), default today. Service time zone.',
             title='Service Date',
         ),
     ] = None

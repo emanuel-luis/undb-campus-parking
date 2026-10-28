@@ -11,6 +11,7 @@ import httpx
 import pytest
 from fastapi import FastAPI
 from sqlalchemy import insert
+from sqlalchemy.exc import DBAPIError
 
 from campus_parking.core.clock import get_now
 from campus_parking.core.db import Base
@@ -19,6 +20,7 @@ from campus_parking.jobs.models import PipelineRun
 from campus_parking.main import create_app
 from campus_parking.registry.models import Lot
 from campus_parking.reports import tables
+from campus_parking.reports.repository import missing_table
 from campus_parking.reports.service import ReportCache, matches, resolve_range
 from tests.conftest import make_settings
 from tests.helpers import NOW
@@ -144,15 +146,59 @@ def test_if_none_match_parsing() -> None:
     assert not matches('"b"', '"a"')
 
 
-def test_cache_clears_on_a_new_run_and_when_full() -> None:
+def test_cache_clears_on_a_new_run_and_evicts_the_least_recently_used() -> None:
     cache = ReportCache(max_entries=2)
     assert cache.get("r1", "k") is None
     cache.put("k", b"1")
     cache.put("k2", b"2")
-    assert cache.get("r1", "k") == b"1"
-    cache.put("k3", b"3")  # over the cap: cleared first
-    assert cache.entries == {"k3": b"3"}
+    assert cache.get("r1", "k") == b"1"  # k is now the most recently used
+    cache.put("k3", b"3")  # over the entry cap: k2 goes
+    assert list(cache.entries) == ["k", "k3"]
     assert cache.get("r2", "k3") is None
+    assert (cache.entries, cache.size) == ({}, 0)
+
+
+def test_cache_is_bounded_in_bytes() -> None:
+    cache = ReportCache(max_entries=100, max_bytes=10)
+    cache.get("r1", "x")
+    cache.put("a", b"1234")
+    cache.put("b", b"1234")
+    cache.put("a", b"12")  # replacing a body keeps the byte count right
+    assert cache.size == 6
+    cache.put("c", b"123456")  # 12 bytes would not fit: the oldest (b) goes
+    assert (list(cache.entries), cache.size) == (["a", "c"], 8)
+    cache.put("huge", b"x" * 11)  # larger than the whole cache: not stored
+    assert "huge" not in cache.entries
+
+
+def test_dates_near_the_calendar_bounds_are_422() -> None:
+    with pytest.raises(InvalidDateRange):
+        resolve_range(None, date(1, 1, 5), TODAY)
+
+
+@pytest.mark.parametrize(
+    ("code", "missing"),
+    [("42P01", True), ("3F000", True), ("42703", False), ("42883", False), (None, False)],
+)
+def test_only_a_missing_relation_means_not_ready(code: str | None, missing: bool) -> None:
+    class PgError(Exception):
+        sqlstate = code
+
+    wrapped = Exception("adapted")
+    wrapped.__cause__ = PgError('relation or column "x" does not exist')
+    assert missing_table(DBAPIError("SELECT 1", None, wrapped)) is missing
+    assert missing_table(DBAPIError("SELECT 1", None, PgError("x"))) is missing
+
+
+async def test_a_missing_column_is_a_500_not_a_503(bare: Env) -> None:
+    async with bare.app.state.engine.begin() as conn:
+        await conn.exec_driver_sql("ATTACH DATABASE ':memory:' AS warehouse")
+        await conn.exec_driver_sql(
+            "CREATE TABLE warehouse.mart_lot_daily (lot_id TEXT, service_date DATE)"
+        )
+    r = await bare.get("daily")
+    assert (r.status_code, r.json()["code"]) == (500, "internal-error")
+    assert (await bare.get("hourly")).status_code == 503  # its table is still missing
 
 
 async def test_missing_marts_answer_503(bare: Env) -> None:

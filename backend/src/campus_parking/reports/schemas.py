@@ -6,6 +6,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from campus_parking.jobs.schemas import RunStatus
+
 DurationBucket = Literal["<30m", "30-60m", "1-2h", "2-4h", "4-6h", ">6h"]
 
 
@@ -14,8 +16,8 @@ class ReportFreshness(BaseModel):
 
     last_run_id: UUID | None = Field(description="Latest successful warehouse run.")
     finished_at: datetime | None = Field(description="When that run finished.")
-    mode: str | None = Field(description="incremental or full.")
-    status: str | None = Field(
+    mode: Literal["incremental", "full"] | None = Field(description="Mode of that run.")
+    status: RunStatus | None = Field(
         description="Status of the most recent warehouse run of any outcome (queued, running, "
         "succeeded, failed): a failed refresh shows here while the data stays as of finished_at."
     )
