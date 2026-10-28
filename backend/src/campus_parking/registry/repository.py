@@ -7,6 +7,7 @@ from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from campus_parking.core.db import insert_ignore
+from campus_parking.occupancy.models import LotOccupancy
 from campus_parking.registry.models import Gate, Lot, LotCapacityHistory, Student
 from campus_parking.registry.schemas import CapacityPeriod
 
@@ -65,6 +66,12 @@ class RegistryRepository:
             await self.session.execute(
                 update(Lot).where(Lot.lot_id == lot_id).values(name=name, updated_at=now)
             )
+        # Every lot has a counter row from birth (a re-PUT of an existing lot changes nothing).
+        await self.session.execute(
+            insert_ignore(self._dialect(), LotOccupancy).values(
+                lot_id=lot_id, occupied=0, version=0, updated_at=now
+            )
+        )
         await self.session.execute(
             delete(LotCapacityHistory).where(LotCapacityHistory.lot_id == lot_id)
         )

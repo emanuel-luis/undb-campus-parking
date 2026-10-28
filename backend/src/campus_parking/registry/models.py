@@ -37,6 +37,8 @@ class Gate(Base):
     lot_id: Mapped[str] = mapped_column(ForeignKey("lots.lot_id"))
     direction: Mapped[str] = mapped_column(Text)
     name: Mapped[str] = mapped_column(Text)
+    last_event_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    last_received_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime)
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime)
 
