@@ -145,6 +145,20 @@ async def test_every_reject_reason(client: httpx.AsyncClient) -> None:
     assert (await lot(client))["version"] == 0
 
 
+async def test_non_object_items_are_schema_invalid(client: httpx.AsyncClient) -> None:
+    body = (await post(client, [None, 5, "x", []])).json()
+    assert [(r["index"], r["reason"]) for r in body["rejects"]] == [
+        (0, "schema_invalid"),
+        (1, "schema_invalid"),
+        (2, "schema_invalid"),
+        (3, "schema_invalid"),
+    ]
+    page = (await client.get("/api/v1/operator/rejects", headers=OPERATOR)).json()
+    assert sorted(map(repr, (i["payload"] for i in page["items"]))) == sorted(
+        map(repr, [None, 5, "x", []])
+    )
+
+
 async def test_rejects_never_fail_the_batch(client: httpx.AsyncClient) -> None:
     r = await post(
         client, [event(1), event(2, student="stu_ffffffffffff"), event(3, student=REF_B)]

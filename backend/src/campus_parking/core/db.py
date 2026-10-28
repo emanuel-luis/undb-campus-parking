@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import Request
-from sqlalchemy import DateTime, MetaData, case, or_
+from sqlalchemy import DateTime, MetaData, case, literal, or_
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.engine import Dialect
@@ -70,7 +70,9 @@ def insert_ignore(dialect_name: str, entity: type[Base]) -> Insert:
 
 def never_backwards(column: Any, value: datetime) -> Any:
     """SQL expression for `column = max(column, value)` that works on Postgres and SQLite."""
-    return case((or_(column.is_(None), column < value), value), else_=column)
+    # Typed explicitly: an untyped datetime parameter would be bound as a naive timestamp.
+    bound = literal(value, UTCDateTime())
+    return case((or_(column.is_(None), column < bound), bound), else_=column)
 
 
 def create_engine(settings: Settings) -> AsyncEngine:
