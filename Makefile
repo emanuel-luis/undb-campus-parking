@@ -3,7 +3,8 @@ SHELL := bash
 .DEFAULT_GOAL := help
 
 .PHONY: help install lint format test test-fast migrate up-db down test-integration openapi \
-	openapi-check d2-install diagrams diagrams-check diagrams-watch
+	openapi-check d2-install diagrams diagrams-check diagrams-watch backend-lint backend-test \
+	generator-install generator-lint generator-test gen-generator-models generator-models-check
 
 help: ## list the targets
 	@grep -hE '^[a-zA-Z0-9_-]+:.*## ' $(MAKEFILE_LIST) | sort | \
@@ -52,24 +53,60 @@ diagrams-watch: ## live preview in the browser while editing: make diagrams-watc
 		echo "usage: make diagrams-watch NAME=<one of: $(basename $(notdir $(DIAGRAMS)))>" >&2; exit 1; }
 	$(D2_RUN) --watch --browser "$${BROWSER:-0}" docs/diagrams/$(NAME).d2 docs/diagrams/$(NAME).svg
 
-# Backend (uv project in backend/). `lint` is exactly what CI runs.
+# Backend (uv project in backend/) and generator (uv project in generator/). `lint` and `test` run
+# both; CI runs the backend-* and generator-* targets as separate jobs.
 BACKEND := uv --project backend
+GENERATOR := uv --project generator
 
-install: ## install the backend environment from backend/uv.lock
+install: ## install the backend and generator environments from their uv.lock files
 	$(BACKEND) sync --locked
+	$(GENERATOR) sync --locked
 
-lint: ## ruff check, ruff format --check, mypy and the OpenAPI drift check (what CI runs)
+lint: backend-lint generator-lint ## everything CI lints: backend and generator
+
+backend-lint: ## ruff check, ruff format --check, mypy and the OpenAPI drift check (CI backend lint)
 	cd backend && uv run ruff check .
 	cd backend && uv run ruff format --check .
 	cd backend && uv run mypy
 	$(MAKE) --no-print-directory openapi-check
 
+generator-install: ## install the generator environment from generator/uv.lock
+	$(GENERATOR) sync --locked
+
+generator-lint: ## generator ruff, mypy and the generated-models drift check (CI generator lint)
+	cd generator && uv run ruff check .
+	cd generator && uv run ruff format --check .
+	cd generator && uv run mypy
+	$(MAKE) --no-print-directory generator-models-check
+
+# Pydantic models of the API, generated from the committed contract. Never edit the output.
+GEN_MODELS_CMD = cd generator && uv run datamodel-codegen --input ../backend/openapi.json \
+	--input-file-type openapi --output-model-type pydantic_v2.BaseModel --use-annotated \
+	--field-constraints --target-python-version 3.12 --disable-timestamp \
+	--enum-field-as-literal all --use-union-operator --use-standard-collections \
+	--formatters black isort
+GEN_MODELS_OUT := src/turnstile_generator/api_models.py
+
+gen-generator-models: ## regenerate generator/src/turnstile_generator/api_models.py from backend/openapi.json
+	$(GEN_MODELS_CMD) --output $(GEN_MODELS_OUT)
+
+generator-models-check: ## regenerate the models into a temp file and diff them with the committed ones
+	@tmp="$$(mktemp)"; trap 'rm -f "$$tmp"' EXIT; \
+	$(GEN_MODELS_CMD) --output "$$tmp" && diff -u $(GEN_MODELS_OUT) "$$tmp"
+
 format: ## apply ruff fixes and formatting
 	cd backend && uv run ruff check --fix .
 	cd backend && uv run ruff format .
+	cd generator && uv run ruff check --fix .
+	cd generator && uv run ruff format .
 
-test: ## pytest with the coverage gate (85%), no Postgres needed
+test: backend-test generator-test ## pytest with the coverage gate (85%) in both projects, no Postgres needed
+
+backend-test: ## backend pytest with the coverage gate (CI backend test)
 	cd backend && uv run pytest
+
+generator-test: ## generator pytest with the coverage gate (CI generator test)
+	cd generator && uv run pytest
 
 test-fast: ## pytest -x -q without coverage
 	cd backend && uv run pytest -x -q --no-cov
