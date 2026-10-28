@@ -57,11 +57,32 @@ async def fetch_column(url: str, sql: str) -> list[str]:
         await engine.dispose()
 
 
+def check_throwaway_database(url: str, app_url: str | None) -> None:
+    """Refuse any database the suite could destroy by mistake: it must be named `*_test` and
+    must not be the application database. Exits the run (a failure, not a skip)."""
+    target = make_url(url)
+    name = target.database or ""
+    if not name.endswith("_test"):
+        pytest.exit(
+            f"TEST_DATABASE_URL names database {name!r}; the integration suite drops its public "
+            "schema, so the name must end with '_test'.",
+            returncode=2,
+        )
+    if app_url:
+        app = make_url(app_url)
+        if (app.host, app.port, app.database) == (target.host, target.port, target.database):
+            pytest.exit(
+                "TEST_DATABASE_URL points at the application database (PARKING_DATABASE_URL).",
+                returncode=2,
+            )
+
+
 @pytest.fixture(scope="session")
 def pg_url() -> str:
     url = os.environ.get("TEST_DATABASE_URL")
     if not url:
         pytest.skip("TEST_DATABASE_URL is not set")
+    check_throwaway_database(url, os.environ.get("PARKING_DATABASE_URL"))
     asyncio.run(_ensure_database(url))
     return url
 

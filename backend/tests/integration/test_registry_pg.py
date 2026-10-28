@@ -1,5 +1,6 @@
 """The registry API end to end on Postgres, on a schema built by the real migration."""
 
+import asyncio
 from collections.abc import AsyncIterator, Callable
 from typing import Any
 
@@ -109,3 +110,25 @@ async def test_database_checks_reject_bad_rows(pg_client: tuple[httpx.AsyncClien
             await conn.execute(
                 text("INSERT INTO gates VALUES ('g-x', 'principal', 'up', 'x', now(), now())")
             )
+
+
+async def test_concurrent_creates_of_the_same_lot_and_gate(
+    pg_client: tuple[httpx.AsyncClient, Any],
+) -> None:
+    """Simultaneous PUTs that both create the same row: one 201, one 200, never a 500."""
+    client, engine = pg_client
+    lots = await asyncio.gather(
+        *(client.put("/api/v1/admin/lots/anexo", json=LOT, headers=ADMIN) for _ in range(4))
+    )
+    assert sorted(r.status_code for r in lots) == [200, 200, 200, 201]
+    gate = {"lot_id": "anexo", "direction": "entry", "name": "Entrada"}
+    gates = await asyncio.gather(
+        *(
+            client.put("/api/v1/admin/gates/anexo-entrada", json=gate, headers=ADMIN)
+            for _ in range(4)
+        )
+    )
+    assert sorted(r.status_code for r in gates) == [200, 200, 200, 201]
+    async with engine.connect() as conn:
+        assert await conn.scalar(text("SELECT count(*) FROM lot_capacity_history")) == 2
+        assert await conn.scalar(text("SELECT count(*) FROM gates")) == 1
