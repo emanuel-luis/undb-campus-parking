@@ -25,6 +25,8 @@ from campus_parking.realtime.hub import Hub
 from campus_parking.realtime.poller import DbSource, Poller
 from campus_parking.realtime.router import router as realtime_router
 from campus_parking.registry.router import router as registry_router
+from campus_parking.reports.router import router as reports_router
+from campus_parking.reports.service import ReportCache
 
 TITLE = "UNDB Campus Parking API"
 TAGS = [
@@ -33,6 +35,7 @@ TAGS = [
     {"name": "admin", "description": "Registry writes (admin API key)."},
     {"name": "availability", "description": "Free spaces per lot, derived from gate events."},
     {"name": "ingestion", "description": "Gate-event intake (ingest API key)."},
+    {"name": "reports", "description": "Daily evolution from the warehouse marts (dbt)."},
     {
         "name": "operator",
         "description": "Ingestion health, rejects and pipeline runs (operator API key).",
@@ -75,6 +78,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(title=TITLE, version=package_version(), openapi_tags=TAGS, lifespan=lifespan)
     app.state.settings = settings
     app.state.draining = False
+    app.state.report_cache = ReportCache()
     # Per-process cap on batches in flight; the events route never waits for it.
     app.state.ingest_semaphore = asyncio.Semaphore(settings.ingest_max_concurrency)
 
@@ -100,6 +104,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     api_v1.include_router(jobs_router)
     api_v1.include_router(occupancy_router)
     api_v1.include_router(realtime_router)
+    api_v1.include_router(reports_router)
     app.include_router(api_v1)
     install_openapi(app)
     return app
