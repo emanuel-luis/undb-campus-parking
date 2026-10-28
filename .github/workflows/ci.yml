@@ -52,3 +52,38 @@ jobs:
         run: uv sync --locked --project backend
       - name: Pytest with the 85% coverage gate
         run: make test
+
+  backend-integration:
+    name: backend integration (Postgres)
+    needs: backend-lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17.11-alpine # keep in sync with compose.yaml
+        env:
+          POSTGRES_USER: parking
+          POSTGRES_PASSWORD: parking
+          POSTGRES_DB: parking_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U parking -d parking_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql+asyncpg://parking:parking@localhost:5432/parking_test
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+          python-version: "3.12"
+      - name: Sync the backend environment
+        run: uv sync --locked --project backend
+      - name: Integration tests against Postgres
+        run: make test-integration

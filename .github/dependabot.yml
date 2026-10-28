@@ -1,0 +1,61 @@
+version: 2
+updates:
+  - package-ecosystem: uv
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      python:
+        patterns: ["*"]
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    ignore:
+      # openapi-typescript 7 requires TypeScript 5 (docs/DECISIONS.md): only minor and patch.
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
+      # The Expo SDK pins react, react-native and their native modules; they move together with
+      # an SDK upgrade (`npx expo install --fix`), never one by one.
+      - dependency-name: expo
+        update-types: ["version-update:semver-major"]
+      - dependency-name: react-native
+      - dependency-name: react
+      - dependency-name: react-dom
+      - dependency-name: react-native-*
+      - dependency-name: "@types/react"
+      - dependency-name: "@types/react-dom"
+      - dependency-name: jest-expo
+        update-types: ["version-update:semver-major"]
+    groups:
+      npm:
+        patterns: ["*"]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+  - package-ecosystem: docker
+    directory: /backend
+    schedule:
+      interval: weekly
+    ignore:
+      # The runtime stays on Python 3.12 (refactor baseline): only patch and digest updates.
+      - dependency-name: python
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+    groups:
+      python-images:
+        patterns: ["*"]
+  - package-ecosystem: docker
+    directory: /apps/web
+    schedule:
+      interval: weekly
+    ignore:
+      # The Node major moves by hand, to an LTS line only and together with .nvmrc, which CI reads.
+      - dependency-name: node
+        update-types: ["version-update:semver-major"]
+    groups:
+      web-images:
+        patterns: ["*"]
