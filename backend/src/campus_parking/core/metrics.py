@@ -5,6 +5,7 @@ from prometheus_client import (
     CONTENT_TYPE_LATEST,
     CollectorRegistry,
     Counter,
+    Gauge,
     Histogram,
     generate_latest,
 )
@@ -44,6 +45,22 @@ event_lag_seconds = Histogram(
     "Seconds between an accepted event's occurred_at and its arrival.",
     buckets=(1, 5, 15, 60, 300, 900, 3600, 6 * 3600, 86400, 7 * 86400, 30 * 86400, 120 * 86400),
     registry=registry,
+)
+
+lot_occupied = Gauge(
+    "parking_lot_occupied",
+    "Open stays per lot, as of the last live snapshot.",
+    ["lot"],
+    registry=registry,
+)
+lot_capacity = Gauge(
+    "parking_lot_capacity",
+    "Current capacity per lot, as of the last live snapshot.",
+    ["lot"],
+    registry=registry,
+)
+live_connections = Gauge(
+    "parking_live_connections", "Open live-availability WebSocket connections.", registry=registry
 )
 
 router = APIRouter()
