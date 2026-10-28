@@ -33,6 +33,8 @@ jobs:
         run: uv sync --locked --project backend
       - name: Ruff and mypy
         run: make lint
+      - name: The committed OpenAPI document matches the code
+        run: make openapi-check
 
   backend-test:
     name: backend test (pytest, coverage gate)
