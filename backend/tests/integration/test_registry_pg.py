@@ -71,16 +71,17 @@ async def test_gate_lifecycle_and_immutability(pg_client: tuple[httpx.AsyncClien
 
 async def test_bulk_students_with_duplicates(pg_client: tuple[httpx.AsyncClient, Any]) -> None:
     client, engine = pg_client
-    refs = [f"stu_{i:012x}" for i in range(1000)]
+    # 990 distinct refs plus 10 repeats: exactly the 1000-item limit, duplicates counted once.
+    refs = [f"stu_{i:012x}" for i in range(990)]
     url = "/api/v1/admin/students/bulk"
     first = await client.post(url, json={"student_refs": [*refs, *refs[:10]]}, headers=ADMIN)
     again = await client.post(
         url, json={"student_refs": [*refs[:5], "stu_ffffffffffff"]}, headers=ADMIN
     )
-    assert first.json() == {"created": 1000, "unchanged": 0}
+    assert first.json() == {"created": 990, "unchanged": 0}
     assert again.json() == {"created": 1, "unchanged": 5}
     async with engine.connect() as conn:
-        assert await conn.scalar(text("SELECT count(*) FROM students")) == 1001
+        assert await conn.scalar(text("SELECT count(*) FROM students")) == 991
 
 
 @pytest.mark.parametrize("bad", ["bad", "stu_XYZ", "stu_0123456789AB", "stu_0123456789abc"])
