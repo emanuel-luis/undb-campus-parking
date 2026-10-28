@@ -1,15 +1,18 @@
-"""Command line entry point: `campus-parking <command>`. Later PRs add worker, migrate, ..."""
+"""Command line entry point: `campus-parking <command>`. Later PRs add worker, close-day, ..."""
 
 import argparse
 import json
+import os
 import sys
 from collections.abc import Callable, Sequence
 from pathlib import Path
 from types import FrameType
 
 import uvicorn
+from alembic.config import Config
 from fastapi import FastAPI
 
+from alembic import command
 from campus_parking.core.logging import configure_logging
 from campus_parking.core.settings import get_settings
 from campus_parking.main import create_app
@@ -54,6 +57,25 @@ def _openapi(args: argparse.Namespace) -> int:
     return 0
 
 
+DEFAULT_ALEMBIC_INI = Path(__file__).resolve().parents[2] / "alembic.ini"
+
+
+def alembic_config(ini: Path | None = None) -> Config:
+    """Alembic config for backend/alembic.ini (or `ini`), valid from any working directory.
+
+    The script location in the ini is relative, so it is pinned to the ini's own folder.
+    """
+    path = Path(ini or os.environ.get("ALEMBIC_INI") or DEFAULT_ALEMBIC_INI).resolve()
+    config = Config(str(path))
+    config.set_main_option("script_location", str(path.parent / "alembic"))
+    return config
+
+
+def _migrate(args: argparse.Namespace) -> int:
+    command.upgrade(alembic_config(args.config), args.revision)
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="campus-parking")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -66,6 +88,13 @@ def build_parser() -> argparse.ArgumentParser:
     openapi = sub.add_parser("openapi", help="dump the OpenAPI document as JSON")
     openapi.add_argument("--output", "-o", help="write to this file instead of stdout")
     openapi.set_defaults(func=_openapi)
+
+    migrate = sub.add_parser("migrate", help="apply database migrations (alembic upgrade)")
+    migrate.add_argument("--revision", default="head", help="target revision (default: head)")
+    migrate.add_argument(
+        "--config", type=Path, help="alembic.ini to use (default: $ALEMBIC_INI or backend/)"
+    )
+    migrate.set_defaults(func=_migrate)
     return parser
 
 
