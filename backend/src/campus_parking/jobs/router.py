@@ -52,7 +52,9 @@ async def post_run(request: Request, body: RunRequest, session: Session, now: No
         raise RequestInvalid(
             f"service_date must be before {today} (the service time zone's today)."
         )
-    run, created = await queue.enqueue(session, body.job, day, "operator", now)
+    if body.mode is not None and body.job != "close_day":
+        raise RequestInvalid("mode is only valid with job close_day.")
+    run, created = await queue.enqueue(session, body.job, day, "operator", now, body.mode)
     if not created:
         raise RunAlreadyActive(f"Run {run.run_id} ({run.status}) already covers {body.job} {day}.")
     return run

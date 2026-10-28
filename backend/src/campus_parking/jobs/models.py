@@ -64,3 +64,5 @@ class ServiceDay(Base):
     service_date: Mapped[date] = mapped_column(Date, primary_key=True)
     closed_at: Mapped[datetime] = mapped_column(UTCDateTime)
     run_id: Mapped[UUID | None] = mapped_column(ForeignKey("pipeline_runs.run_id"))
+    # gate_events rows the last successful export took; NULL until one succeeds.
+    exported_events: Mapped[int | None] = mapped_column(Integer)

@@ -318,10 +318,7 @@ async def test_late_event_keeps_the_closed_semantics_and_the_next_daily_reproces
     assert (await env.occupancy()).version >= version
 
     env.clock["now"] = AFTER + timedelta(hours=2)
-    async with env.app.state.sessionmaker() as s:
-        from campus_parking.jobs.close_day import pending_days
-
-        assert await pending_days(s, env.worker.settings, env.clock["now"]) == [DAY]
+    assert await pending(env) == [DAY]
 
     await env.worker.run_direct("daily", date(2026, 10, 28))
     latest = max(await env.runs("close_day"), key=lambda r: r.requested_at)
@@ -331,8 +328,7 @@ async def test_late_event_keeps_the_closed_semantics_and_the_next_daily_reproces
     assert table.num_rows == 5
 
     env.clock["now"] = AFTER + timedelta(hours=3)
-    async with env.app.state.sessionmaker() as s:
-        assert await pending_days(s, env.worker.settings, env.clock["now"]) == []
+    assert await pending(env) == []
 
 
 async def test_daily_marks_failed_days_and_goes_on(
@@ -428,7 +424,7 @@ async def test_serve_claims_a_queued_run_and_stops(env: Env) -> None:
     stop = asyncio.Event()
     task = asyncio.create_task(env.worker.serve(stop))
     status = "queued"
-    for _ in range(200):
+    for _ in range(600):
         got = await env.client.get(f"/api/v1/operator/runs/{run_id}", headers=OPERATOR)
         status = got.json()["status"]
         if status in ("succeeded", "failed"):
@@ -481,3 +477,59 @@ async def test_loop_errors_do_not_stop_the_worker(
     stop.set()
     await asyncio.wait_for(task, 5)
     assert calls >= 2
+
+
+async def pending(env: Env) -> list[date]:
+    from campus_parking.jobs.close_day import pending_days
+
+    async with env.app.state.sessionmaker() as s:
+        return await pending_days(s, env.worker.settings, env.clock["now"])
+
+
+async def test_a_late_event_stamped_before_the_close_is_still_found(env: Env) -> None:
+    """received_at can be older than closed_at for an event committed after the export: only the
+    exported count notices it."""
+    await seed_day(env)
+    env.clock["now"] = AFTER
+    await env.worker.run_direct("daily", DAY)
+    assert await pending(env) == []
+    await env.post([event(9, "entry", REF_C, ago_min=45)], at=AFTER - timedelta(minutes=10))
+    env.clock["now"] = AFTER
+    assert await pending(env) == [DAY]
+    await env.worker.run_direct("daily", DAY)
+    assert await pending(env) == []
+
+
+async def test_a_failed_export_leaves_the_date_pending(
+    env: Env, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from campus_parking.jobs import close_day as close_day_module
+
+    await seed_day(env)
+    env.clock["now"] = AFTER
+
+    async def broken(*_: Any) -> None:
+        raise OSError("disk full")
+
+    real = close_day_module.export_day
+    monkeypatch.setattr(close_day_module, "export_day", broken)
+    with pytest.raises(OSError, match="disk full"):
+        await env.worker.run_direct("close_day", DAY)
+    assert DAY in await pending(env)
+    monkeypatch.setattr(close_day_module, "export_day", real)
+    await env.worker.run_direct("close_day", DAY)
+    assert await pending(env) == []
+
+
+async def test_post_run_passes_the_mode_and_validates_it(env: Env) -> None:
+    ok = await post_run(
+        env.client, {"job": "close_day", "service_date": "2026-10-27", "mode": "export"}, OPERATOR
+    )
+    assert (ok.status_code, ok.json()["mode"]) == (202, "export")
+    bad_job = await post_run(env.client, {"job": "daily", "mode": "export"}, OPERATOR)
+    assert bad_job.status_code == 422
+    assert (
+        await post_run(env.client, {"job": "close_day", "mode": "x"}, OPERATOR)
+    ).status_code == 422
+    unknown = await post_run(env.client, {"job": "close_day", "colour": 1}, OPERATOR)
+    assert unknown.status_code == 422

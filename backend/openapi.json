@@ -989,6 +989,7 @@
         "type": "object"
       },
       "RunRequest": {
+        "additionalProperties": false,
         "properties": {
           "job": {
             "enum": [
@@ -997,6 +998,19 @@
             ],
             "title": "Job",
             "type": "string"
+          },
+          "mode": {
+            "anyOf": [
+              {
+                "const": "export",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "`export` re-exports the day without closing it (close_day only).",
+            "title": "Mode"
           },
           "service_date": {
             "anyOf": [

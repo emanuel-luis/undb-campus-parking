@@ -78,6 +78,7 @@ def upgrade() -> None:
         sa.Column("service_date", sa.Date(), nullable=False),
         sa.Column("closed_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("run_id", sa.Uuid(), nullable=True),
+        sa.Column("exported_events", sa.Integer(), nullable=True),
         sa.ForeignKeyConstraint(
             ["run_id"], ["pipeline_runs.run_id"], name=op.f("fk_service_days_run_id_pipeline_runs")
         ),
