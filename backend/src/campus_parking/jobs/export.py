@@ -10,6 +10,7 @@ import asyncio
 import hashlib
 import json
 import shutil
+import time
 from dataclasses import dataclass
 from datetime import date, timedelta
 from pathlib import Path
@@ -28,6 +29,7 @@ from campus_parking.jobs import archive_contract as contract
 
 PART = "part-00000.parquet"
 MANIFEST = "_manifest.json"
+RENAME_ATTEMPTS = 40
 
 
 @dataclass(frozen=True)
@@ -40,6 +42,18 @@ class DatasetExport:
 
 def partition_dir(lake: Path, dataset: str, partition: str, day: date) -> Path:
     return lake / "raw" / dataset / f"{partition}={day.isoformat()}"
+
+
+def _rename(src: Path, dst: Path) -> None:
+    """Windows refuses to rename a directory while a reader has a file in it open: retry briefly."""
+    for attempt in range(RENAME_ATTEMPTS):
+        try:
+            src.rename(dst)
+            return
+        except PermissionError:
+            if attempt == RENAME_ATTEMPTS - 1:
+                raise
+            time.sleep(0.05)
 
 
 def publish_partition(
@@ -72,8 +86,8 @@ def publish_partition(
         json.dumps(body, indent=2, sort_keys=True) + "\n", encoding="utf-8", newline="\n"
     )
     if final.exists():
-        final.rename(old)
-    tmp.rename(final)
+        _rename(final, old)
+    _rename(tmp, final)
     shutil.rmtree(old, ignore_errors=True)
     return DatasetExport(dataset, "written", table.num_rows, file_sha)
 
