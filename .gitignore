@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+# Node / Expo
+node_modules/
+dist/
+web-build/
+.expo/
+coverage/
+*.tsbuildinfo
+
+# Local environment (copy .env.example to .env); never commit it.
+.env
+.env.*
+!.env.example
+
+# Generated data: Parquet exports, DuckDB files, simulator output
+data/
+*.duckdb
+*.duckdb.wal
+
+# Editors and OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
