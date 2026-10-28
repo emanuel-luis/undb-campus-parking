@@ -7,7 +7,7 @@ from zoneinfo import ZoneInfo
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from campus_parking.core.clock import service_date
+from campus_parking.core.clock import day_cutoff, service_date
 from campus_parking.core.problems import LotNotFound
 from campus_parking.occupancy.domain import lot_figures
 from campus_parking.occupancy.pairing import pair_stays
@@ -18,22 +18,27 @@ from campus_parking.registry.repository import RegistryRepository
 
 
 async def apply_touched(
-    session: AsyncSession, touched_keys: Collection[StayKey], now: datetime
+    session: AsyncSession, touched_keys: Collection[StayKey], now: datetime, tz: ZoneInfo
 ) -> dict[str, int]:
     """Rebuild the stays of the touched (lot, student, service day) keys from all their events.
 
     Returns, per lot, the change in open stays; the caller adds it to `lot_occupancy`.
-    Stays of a day are deleted and re-inserted, so arrival order cannot matter.
+    Stays of a day are deleted and re-inserted, so arrival order cannot matter. A day that
+    close_day has closed keeps its closed semantics: an entry without exit stays
+    `closed_by_reconciliation` at the day's cutoff, never `open`.
     """
     # ponytail: one statement for all keys; chunk it if a caller ever passes thousands of keys.
     keys = sorted(touched_keys)
     repo = OccupancyRepository(session)
     before = await repo.open_by_lot(keys)
     events = await repo.events_by_key(keys)
+    closed = await repo.closed_days({day for _, _, day in keys})
     rows = []
     after: Counter[str] = Counter()
     for lot_id, student_ref, day in keys:
-        for stay in pair_stays(events.get((lot_id, student_ref, day), []), False, None):
+        is_closed = day in closed
+        cutoff = day_cutoff(day, tz) if is_closed else None
+        for stay in pair_stays(events.get((lot_id, student_ref, day), []), is_closed, cutoff):
             after[lot_id] += stay.status == "open"
             rows.append(
                 {

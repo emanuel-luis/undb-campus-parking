@@ -85,6 +85,12 @@ class RunAlreadyActive(DomainError):
     title = "A run is already queued or running"
 
 
+class RunNotFound(DomainError):
+    code = "run-not-found"
+    status = 404
+    title = "Run not found"
+
+
 class DayNotClosed(DomainError):
     """close_day for a date that is not over yet in the service time zone."""
 

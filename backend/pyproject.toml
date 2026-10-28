@@ -66,6 +66,11 @@ strict = true
 plugins = ["pydantic.mypy"]
 enable_error_code = ["ignore-without-code"]
 
+[[tool.mypy.overrides]]
+# pyarrow ships no type information.
+module = ["pyarrow", "pyarrow.*"]
+ignore_missing_imports = true
+
 [tool.pydantic-mypy]
 init_typed = true
 init_forbid_extra = true
