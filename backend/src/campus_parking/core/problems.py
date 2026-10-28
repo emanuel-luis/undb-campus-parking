@@ -62,6 +62,23 @@ class GateImmutable(DomainError):
     title = "Gate lot and direction cannot change"
 
 
+class IngestBusy(DomainError):
+    code = "ingest-busy"
+    status = 429
+    title = "Ingestion is busy"
+
+    def __init__(self, detail: str | None = None) -> None:
+        super().__init__(detail, headers={"Retry-After": "1"})
+
+
+class RequestInvalid(DomainError):
+    """A whole-request error that the framework's own validation cannot see."""
+
+    code = "validation-error"
+    status = 422
+    title = "Validation error"
+
+
 class ServiceDraining(DomainError):
     code = "service-draining"
     status = 503
