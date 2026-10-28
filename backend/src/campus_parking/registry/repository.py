@@ -3,7 +3,7 @@
 from collections import defaultdict
 from datetime import datetime
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from campus_parking.core.db import insert_ignore
@@ -44,18 +44,27 @@ class RegistryRepository:
             out[gate.lot_id].append(gate)
         return out
 
+    def _dialect(self) -> str:
+        return self.session.get_bind().dialect.name
+
     async def save_lot(
         self, lot_id: str, name: str, history: list[CapacityPeriod], now: datetime
     ) -> bool:
-        """Create the lot or rename it, and replace its capacity history. True when created."""
-        lot = await self.get_lot(lot_id)
-        created = lot is None
-        if lot is None:
-            self.session.add(Lot(lot_id=lot_id, name=name, created_at=now, updated_at=now))
-        else:
-            lot.name = name
-            lot.updated_at = now
-        await self.session.flush()
+        """Create the lot or rename it, and replace its capacity history. True when created.
+
+        Insert-or-ignore first, so two concurrent creates of the same lot never hit the primary
+        key: the loser gets no row back and takes the update path, whose UPDATE also holds the
+        row lock that serializes the history replacement below."""
+        inserted = await self.session.execute(
+            insert_ignore(self._dialect(), Lot)
+            .values(lot_id=lot_id, name=name, created_at=now, updated_at=now)
+            .returning(Lot.lot_id)
+        )
+        created = inserted.first() is not None
+        if not created:
+            await self.session.execute(
+                update(Lot).where(Lot.lot_id == lot_id).values(name=name, updated_at=now)
+            )
         await self.session.execute(
             delete(LotCapacityHistory).where(LotCapacityHistory.lot_id == lot_id)
         )
@@ -69,14 +78,38 @@ class RegistryRepository:
     async def get_gate(self, gate_id: str) -> Gate | None:
         return await self.session.get(Gate, gate_id)
 
-    async def add_gate(self, gate: Gate) -> None:
-        self.session.add(gate)
-        await self.session.flush()
+    async def lock_gate(self, gate_id: str) -> Gate | None:
+        """The gate row with a row lock (FOR UPDATE on Postgres; SQLite locks the database)."""
+        stmt = (
+            select(Gate)
+            .where(Gate.gate_id == gate_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+        return await self.session.scalar(stmt)
+
+    async def insert_gate(
+        self, gate_id: str, lot_id: str, direction: str, name: str, now: datetime
+    ) -> bool:
+        """Insert-or-ignore the gate; False when another transaction created it first."""
+        inserted = await self.session.execute(
+            insert_ignore(self._dialect(), Gate)
+            .values(
+                gate_id=gate_id,
+                lot_id=lot_id,
+                direction=direction,
+                name=name,
+                created_at=now,
+                updated_at=now,
+            )
+            .returning(Gate.gate_id)
+        )
+        return inserted.first() is not None
 
     async def insert_students(self, refs: list[str], now: datetime) -> int:
         """Insert the missing refs in one statement; returns how many were really inserted."""
         stmt = (
-            insert_ignore(self.session.get_bind().dialect.name, Student)
+            insert_ignore(self._dialect(), Student)
             .values([{"student_ref": r, "created_at": now, "updated_at": now} for r in refs])
             .returning(Student.student_ref)
         )

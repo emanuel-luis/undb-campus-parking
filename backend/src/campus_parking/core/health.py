@@ -8,7 +8,11 @@ from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
-from campus_parking.core.problems import DatabaseUnavailable, ServiceDraining
+from campus_parking.core.problems import (
+    DatabaseUnavailable,
+    ServiceDraining,
+    problem_responses,
+)
 
 router = APIRouter(tags=["health"])
 
@@ -30,7 +34,7 @@ async def healthz() -> HealthStatus:
 @router.get(
     "/readyz",
     response_model=Readiness,
-    responses={503: {"description": "Draining or database unavailable (problem+json)."}},
+    responses=problem_responses(503),
 )
 async def readyz(request: Request) -> Readiness:
     if request.app.state.draining:

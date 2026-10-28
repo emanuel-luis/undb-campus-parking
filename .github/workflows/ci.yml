@@ -31,10 +31,8 @@ jobs:
           python-version: "3.12"
       - name: Sync the backend environment
         run: uv sync --locked --project backend
-      - name: Ruff and mypy
+      - name: Ruff, mypy and the OpenAPI drift check
         run: make lint
-      - name: The committed OpenAPI document matches the code
-        run: make openapi-check
 
   backend-test:
     name: backend test (pytest, coverage gate)

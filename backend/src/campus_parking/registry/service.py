@@ -59,29 +59,25 @@ class RegistryService:
     ) -> tuple[GateOut, bool]:
         """Create the gate or rename it. Its lot and direction are fixed from creation (the
         append-only events reference them), so a different value is a 409 `gate-immutable`."""
-        gate = await self.repo.get_gate(gate_id)
+        gate = await self.repo.lock_gate(gate_id)
         if gate is None:
             if await self.repo.get_lot(body.lot_id) is None:
                 raise LotNotFound(f"Lot {body.lot_id!r} does not exist.")
-            gate = Gate(
-                gate_id=gate_id,
-                lot_id=body.lot_id,
-                direction=body.direction,
-                name=body.name,
-                created_at=now,
-                updated_at=now,
-            )
-            await self.repo.add_gate(gate)
-            created = True
-        else:
-            if (gate.lot_id, gate.direction) != (body.lot_id, body.direction):
-                raise GateImmutable(f"Gate {gate_id!r} keeps its lot and direction.")
-            if gate.name != body.name:
-                gate.name = body.name
-                gate.updated_at = now
-            created = False
+            if await self.repo.insert_gate(gate_id, body.lot_id, body.direction, body.name, now):
+                await self.repo.commit()
+                return GateOut(
+                    gate_id=gate_id, lot_id=body.lot_id, direction=body.direction, name=body.name
+                ), True
+            # A concurrent request created it first: continue as an update of that row.
+            gate = await self.repo.lock_gate(gate_id)
+            assert gate is not None
+        if (gate.lot_id, gate.direction) != (body.lot_id, body.direction):
+            raise GateImmutable(f"Gate {gate_id!r} keeps its lot and direction.")
+        if gate.name != body.name:
+            gate.name = body.name
+            gate.updated_at = now
         await self.repo.commit()
-        return _gate_out(gate), created
+        return _gate_out(gate), False
 
     async def bulk_students(self, refs: list[str], now: datetime) -> BulkUpsertResult:
         unique = list(dict.fromkeys(refs))

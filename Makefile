@@ -58,10 +58,11 @@ BACKEND := uv --project backend
 install: ## install the backend environment from backend/uv.lock
 	$(BACKEND) sync --locked
 
-lint: ## ruff check, ruff format --check and mypy (what CI runs)
+lint: ## ruff check, ruff format --check, mypy and the OpenAPI drift check (what CI runs)
 	cd backend && uv run ruff check .
 	cd backend && uv run ruff format --check .
 	cd backend && uv run mypy
+	$(MAKE) --no-print-directory openapi-check
 
 format: ## apply ruff fixes and formatting
 	cd backend && uv run ruff check --fix .
