@@ -1,0 +1,68 @@
+[project]
+name = "turnstile-generator"
+version = "0.1.0"
+description = "Synthetic UNDB face-ID turnstile system: an API client that feeds the campus parking backend."
+requires-python = ">=3.12"
+authors = [{ name = "Emanuel Luis", email = "emanuel.filho08@gmail.com" }]
+dependencies = [
+    "httpx>=0.28.1",
+    "pydantic>=2.14",
+    "pydantic-settings>=2.16.1",
+    "tzdata",
+]
+
+[project.scripts]
+turnstile-gen = "turnstile_generator.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.13.5,<0.14.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "turnstile_generator"
+
+[dependency-groups]
+dev = [
+    "datamodel-code-generator==0.87.0",
+    "hypothesis>=6.170",
+    "mypy>=2.4",
+    "pytest>=9.2",
+    "pytest-asyncio>=1.4.1",
+    "pytest-cov>=7.1",
+    "pytest-timeout>=2.4",
+    "ruff>=0.17.3",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+# Generated from backend/openapi.json; never edited by hand.
+extend-exclude = ["src/turnstile_generator/api_models.py"]
+
+[tool.ruff.lint]
+# A broad except needs `# noqa: BLE001 - reason`.
+extend-select = ["BLE", "I", "UP", "B", "SIM", "RUF", "DTZ"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["DTZ"]
+
+[tool.mypy]
+files = ["src"]
+python_version = "3.12"
+strict = true
+plugins = ["pydantic.mypy"]
+enable_error_code = ["ignore-without-code"]
+
+[tool.pydantic-mypy]
+init_typed = true
+init_forbid_extra = true
+
+[tool.pytest.ini_options]
+addopts = "-ra --strict-markers --strict-config --cov=turnstile_generator --cov-report=term-missing:skip-covered --cov-fail-under=85"
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+timeout = 60
+
+[tool.coverage.run]
+branch = true
