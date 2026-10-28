@@ -244,11 +244,11 @@ class RunRequest(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
-    job: Annotated[Literal['daily', 'close_day'], Field(title='Job')]
+    job: Annotated[Literal['daily', 'close_day', 'warehouse'], Field(title='Job')]
     mode: Annotated[
-        Literal['export'] | None,
+        Literal['export', 'incremental', 'full'] | None,
         Field(
-            description='`export` re-exports the day without closing it (close_day only).',
+            description='close_day: `export` re-exports the day without closing it. warehouse: `incremental` (default, `dbt build`) or `full` (`dbt source freshness` and `dbt build --full-refresh`). daily takes no mode.',
             title='Mode',
         ),
     ] = None

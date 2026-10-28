@@ -54,6 +54,16 @@ def test_close_day_runs_and_records_a_cli_run(db: Path, tmp_path: Path) -> None:
     assert (tmp_path / "lake" / "raw" / "gate_events" / "service_date=2020-01-01").is_dir()
 
 
+def test_warehouse_command_and_worker_once_warehouse(db: Path, fake_dbt: list[str]) -> None:
+    assert cli.main(["warehouse", "--full", "--date", PAST.isoformat()]) == 0
+    assert cli.main(["worker", "--once", "warehouse"]) == 0
+    assert fake_dbt == ["full", "incremental"]
+    assert [(r.job, r.mode, r.status) for r in runs(db)] == [
+        ("warehouse", "full", "succeeded"),
+        ("warehouse", "incremental", "succeeded"),
+    ]
+
+
 def test_export_is_a_close_day_run_in_export_mode(db: Path) -> None:
     assert cli.main(["export", "--date", PAST.isoformat()]) == 0
     (run,) = runs(db)

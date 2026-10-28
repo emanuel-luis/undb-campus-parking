@@ -29,6 +29,11 @@ router = APIRouter(
 )
 
 Session = Annotated[AsyncSession, Depends(get_session)]
+VALID_MODES: dict[str, tuple[str | None, ...]] = {
+    "daily": (None,),
+    "close_day": (None, "export"),
+    "warehouse": (None, "incremental", "full"),
+}
 Now = Annotated[datetime, Depends(get_now)]
 
 
@@ -38,7 +43,8 @@ Now = Annotated[datetime, Depends(get_now)]
     response_model=PipelineRunOut,
     summary="Queue a pipeline run",
     description=(
-        "Queues `daily` or `close_day` for a past service date (default: yesterday). The worker "
+        "Queues `daily`, `close_day` or `warehouse` for a past service date (default: "
+        "yesterday). The worker "
         "picks it up; poll `GET /operator/runs/{run_id}`. 409 when one is already queued or "
         "running for the same job and date."
     ),
@@ -52,9 +58,10 @@ async def post_run(request: Request, body: RunRequest, session: Session, now: No
         raise RequestInvalid(
             f"service_date must be before {today} (the service time zone's today)."
         )
-    if body.mode is not None and body.job != "close_day":
-        raise RequestInvalid("mode is only valid with job close_day.")
-    run, created = await queue.enqueue(session, body.job, day, "operator", now, body.mode)
+    if body.mode not in VALID_MODES[body.job]:
+        raise RequestInvalid(f"mode {body.mode!r} is not valid for job {body.job}.")
+    mode = "incremental" if body.job == "warehouse" and body.mode is None else body.mode
+    run, created = await queue.enqueue(session, body.job, day, "operator", now, mode)
     if not created:
         raise RunAlreadyActive(f"Run {run.run_id} ({run.status}) already covers {body.job} {day}.")
     return run
