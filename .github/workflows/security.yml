@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   pip-audit:
-    name: pip-audit (known vulnerabilities in backend/uv.lock)
+    name: pip-audit (known vulnerabilities in backend and generator uv.lock)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -32,6 +32,10 @@ jobs:
       # checks exactly that set and resolves nothing itself.
       - run: uv export --project backend --frozen --all-extras --all-groups --no-emit-project -o "$RUNNER_TEMP/locked.txt"
       - run: uvx pip-audit==2.10.1 --disable-pip --progress-spinner off -r "$RUNNER_TEMP/locked.txt"
+      - name: Audit generator/uv.lock
+        run: |
+          uv export --project generator --frozen --all-extras --all-groups --no-emit-project -o "$RUNNER_TEMP/generator-locked.txt"
+          uvx pip-audit==2.10.1 --disable-pip --progress-spinner off -r "$RUNNER_TEMP/generator-locked.txt"
 
   zizmor:
     name: zizmor (GitHub Actions workflows)
