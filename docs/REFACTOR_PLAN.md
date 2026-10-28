@@ -26,7 +26,7 @@ contract: when code and plan disagree, fix one of them in the same PR.
 backend/
   pyproject.toml uv.lock alembic.ini Dockerfile .dockerignore
   openapi.json                 committed contract (source for generator models and TS client)
-  alembic/versions/            0001_registry_ingestion_occupancy, 0002_jobs
+  alembic/versions/            0001_registry, 0002_ingestion_occupancy, 0003_jobs
   warehouse/                   dbt project
   src/campus_parking/
     main.py        create_app(settings) + lifespan (engine, hub, poller, draining flag)
@@ -68,7 +68,10 @@ them.
 
 Alembic owns schema `public`; dbt owns `warehouse` and `warehouse_staging`.
 
-### 0001_registry_ingestion_occupancy
+### 0001_registry and 0002_ingestion_occupancy
+
+`0001_registry` holds `lots`, `lot_capacity_history`, `gates` (without the `last_*` columns) and
+`students`; `0002_ingestion_occupancy` adds the other tables below and the `gates.last_*` columns.
 
 | Table | Columns, keys, constraints, indexes |
 | --- | --- |
@@ -82,7 +85,7 @@ Alembic owns schema `public`; dbt owns `warehouse` and `warehouse_staging`.
 | `stays` | `stay_id uuid PK` (= coalesce(entry, exit event id)), `lot_id`, `student_ref`, `service_date`, `entry_event_id UNIQUE NULL`, `exit_event_id UNIQUE NULL`, `entered_at`, `exited_at`, `ended_at`, `status CHECK IN (open, closed, missing_exit, exit_only, closed_by_reconciliation)`, `duration_s`, `updated_at`; indexes (`lot_id`, `student_ref`, `service_date`), (`updated_at`), partial (`lot_id`) WHERE status = 'open' |
 | `lot_occupancy` | `lot_id PK FK`, `occupied CHECK >= 0`, `version bigint`, `updated_at`, `last_event_at`; created with the lot |
 
-### 0002_jobs
+### 0003_jobs
 
 - `pipeline_runs`: `run_id uuid PK`, `parent_run_id`, `job CHECK IN (daily, close_day, warehouse)`,
   `mode`, `trigger CHECK IN (schedule, operator, cli)`, `service_date NOT NULL`,
@@ -95,7 +98,7 @@ Alembic owns schema `public`; dbt owns `warehouse` and `warehouse_staging`.
 ### Registry rules
 
 Lot and gate ids are stable natural keys; no deletes (append-only events reference them). A gate's
-`lot_id` and `direction` cannot change once it has events (409 `gate-immutable`). A lot PUT
+`lot_id` and `direction` cannot change once the gate exists (409 `gate-immutable`; DECISIONS 32). A lot PUT
 replaces its name and its whole capacity history (same body, same state).
 
 ## Ingestion
@@ -339,23 +342,25 @@ Each PR leaves CI green and gets a fresh-context `reviewer` before merge.
 1. **Backend baseline:** `backend/` project, `core/`, app factory, CLI skeleton, Alembic setup;
    Makefile (`install`, `lint`, `test`, `test-fast`); CI backend lint and test jobs;
    `security.yml` (pip-audit, zizmor); `.env.example`; untrack `__pycache__` and Parquet.
-2. **Registry, ingestion, occupancy:** 0001; admin, public, ingest, rejects and health routes;
-   pairing with hypothesis; `openapi.json` with a drift check; compose with postgres only; CI
+2. **Registry and schema foundation:** 0001; admin registry routes and public `GET /lots`;
+   `campus-parking migrate`; `openapi.json` with a drift check; compose with postgres only; CI
    integration job.
-3. **Generator:** project, generated models with drift check, bootstrap, backfill, live, sender, CI
+3. **Ingestion and occupancy:** 0002; ingest, availability, rejects and ingestion-health routes;
+   pairing with hypothesis.
+4. **Generator:** project, generated models with drift check, bootstrap, backfill, live, sender, CI
    job. Delete `undb_faceid/` and `api/`.
-4. **Real-time:** poller, hub, WebSocket, gauges.
-5. **Worker and batch:** 0002, claim loop, scheduler, close_day, export with contract, operator
+5. **Real-time:** poller, hub, WebSocket, gauges.
+6. **Worker and batch:** 0003, claim loop, scheduler, close_day, export with contract, operator
    runs.
-6. **Warehouse:** dbt project, warehouse jobs, reports and freshness; dbt in CI (built twice,
+7. **Warehouse:** dbt project, warehouse jobs, reports and freshness; dbt in CI (built twice,
    marts unchanged).
-7. **api-client:** npm workspaces, generated types, `live.ts`, hooks, drift check.
-8. **Web and mobile** (disjoint, in parallel): Vagas, lot detail, Relatórios; Operador on web
+8. **api-client:** npm workspaces, generated types, `live.ts`, hooks, drift check.
+9. **Web and mobile** (disjoint, in parallel): Vagas, lot detail, Relatórios; Operador on web
    (ingestion health, rejects, runs, enqueue); UNDB identity and the unofficial-project notice.
-9. **Docker:** backend image (api, worker, migrate one-shot) and generator image, multi-stage and
-   non-root; nginx web with WebSocket upgrade; compose (postgres, migrate, api, worker, generator,
-   web); `make demo`; CI compose smoke.
-10. **Docs:** README (origin, what was rebuilt, the backend/generator split), D2 diagrams with the
+10. **Docker:** backend image (api, worker, migrate one-shot) and generator image, multi-stage and
+    non-root; nginx web with WebSocket upgrade; compose (postgres, migrate, api, worker,
+    generator, web); `make demo`; CI compose smoke.
+11. **Docs:** README (origin, what was rebuilt, the backend/generator split), D2 diagrams with the
     `diagrams` job, `flow.md`, CHANGELOG, Dependabot. Then branch protection.
 
 ## Risks
@@ -363,7 +368,7 @@ Each PR leaves CI green and gets a fresh-context `reviewer` before merge.
 - `GateEvent` reaches the OpenAPI components only through the `core/openapi.py` hook (the body is
   validated per item); an API test asserts it.
 - FastAPI and dbt in one lock may conflict; fallback: `uv tool install` dbt inside the image.
-- Backfill time over HTTP depends on the cost of a 1000-item batch; the PR 6 e2e times a 7-day
+- Backfill time over HTTP depends on the cost of a 1000-item batch; the PR 7 e2e times a 7-day
   load.
 - `make demo` must generate random local API keys; nothing secret is committed.
 - Expo Go runs only the latest store SDK; both apps pin the React version Expo SDK 57 requires.

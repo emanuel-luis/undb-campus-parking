@@ -50,6 +50,18 @@ class Unauthorized(DomainError):
         super().__init__(detail, headers={"WWW-Authenticate": "ApiKey"})
 
 
+class LotNotFound(DomainError):
+    code = "lot-not-found"
+    status = 404
+    title = "Lot not found"
+
+
+class GateImmutable(DomainError):
+    code = "gate-immutable"
+    status = 409
+    title = "Gate lot and direction cannot change"
+
+
 class ServiceDraining(DomainError):
     code = "service-draining"
     status = 503
@@ -66,6 +78,11 @@ class DatabaseUnavailable(DomainError):
 
     def __init__(self, detail: str | None = None) -> None:
         super().__init__(detail, headers={"Retry-After": "5"})
+
+
+def problem_responses(*statuses: int) -> dict[int | str, dict[str, Any]]:
+    """OpenAPI `responses` entries documenting problem+json bodies for the given statuses."""
+    return {s: {"model": Problem, "description": "Problem details (RFC 9457)."} for s in statuses}
 
 
 def _request_id(request: Request) -> str | None:
