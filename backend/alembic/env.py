@@ -11,6 +11,7 @@ from alembic import context
 from campus_parking.core.db import Base
 from campus_parking.core.settings import Settings
 from campus_parking.ingestion import models as ingestion_models  # noqa: F401  (registers tables)
+from campus_parking.jobs import models as jobs_models  # noqa: F401  (registers tables)
 from campus_parking.occupancy import models as occupancy_models  # noqa: F401  (registers tables)
 from campus_parking.registry import models as registry_models  # noqa: F401  (registers tables)
 
