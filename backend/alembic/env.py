@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from alembic import context
 from campus_parking.core.db import Base
 from campus_parking.core.settings import Settings
+from campus_parking.registry import models as registry_models  # noqa: F401  (registers tables)
 
 config = context.config
 if config.config_file_name is not None:

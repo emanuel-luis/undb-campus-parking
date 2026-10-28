@@ -16,11 +16,14 @@ from campus_parking.core.middleware import (
 )
 from campus_parking.core.problems import register_problem_handlers
 from campus_parking.core.settings import Settings, get_settings
+from campus_parking.registry.router import router as registry_router
 
 TITLE = "UNDB Campus Parking API"
-TAGS = [{"name": "health", "description": "Liveness and readiness probes."}]
-
-api_v1 = APIRouter(prefix="/api/v1")
+TAGS = [
+    {"name": "health", "description": "Liveness and readiness probes."},
+    {"name": "lots", "description": "Public lot registry: capacity and gates."},
+    {"name": "admin", "description": "Registry writes (admin API key)."},
+]
 
 
 def package_version() -> str:
@@ -63,5 +66,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.include_router(health.router)
     app.include_router(metrics.router)
+    api_v1 = APIRouter(prefix="/api/v1")
+    api_v1.include_router(registry_router)
     app.include_router(api_v1)
     return app
