@@ -234,12 +234,23 @@ async def run_once(
     trigger: str = "cli",
     mode: str | None = None,
 ) -> int:
-    """`worker --once`, `close-day` and `export`: one run in this process; exit code for the CLI.
-    0 succeeded, 1 failed or already active, 2 the date is not over yet."""
+    """`worker --once`, `close-day`, `export` and `warehouse`: one run in this process; exit
+    code for the CLI. 0 succeeded, 1 failed or already active, 2 the date is not allowed (not
+    over yet; for warehouse, in the future)."""
     engine = create_engine(settings)
     worker = Worker(settings, create_sessionmaker(engine))
     try:
-        target = day or service_date(worker.clock(), settings.tzinfo) - timedelta(days=1)
+        today = service_date(worker.clock(), settings.tzinfo)
+        if job == "warehouse":  # the date only labels the run: today or a past date
+            if day is not None and day > today:
+                logger.error(
+                    f"{day} is in the future in {settings.timezone}; warehouse runs "
+                    "take today or a past date."
+                )
+                return 2
+            target = day or today
+        else:
+            target = day or today - timedelta(days=1)
         if job == "export":
             job, mode = "close_day", "export"
         try:

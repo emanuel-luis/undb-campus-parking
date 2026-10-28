@@ -150,7 +150,7 @@ def build_parser() -> argparse.ArgumentParser:
     warehouse.add_argument(
         "--full", action="store_true", help="source freshness and build --full-refresh"
     )
-    add_date(warehouse, "service date the run is recorded under (default: yesterday)")
+    add_date(warehouse, "date the run is recorded under: today (default) or a past date")
     warehouse.set_defaults(func=_warehouse)
 
     worker = sub.add_parser("worker", help="run the batch worker (claims runs from the queue)")
@@ -159,7 +159,7 @@ def build_parser() -> argparse.ArgumentParser:
         choices=["daily", "close_day", "warehouse"],
         help="run this job now, then exit (warehouse runs incremental)",
     )
-    add_date(worker, "with --once: the service date (default: yesterday)")
+    add_date(worker, "with --once: the service date (default: yesterday; warehouse: today)")
     worker.set_defaults(func=_worker)
     return parser
 

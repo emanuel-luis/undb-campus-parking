@@ -43,8 +43,8 @@ Now = Annotated[datetime, Depends(get_now)]
     response_model=PipelineRunOut,
     summary="Queue a pipeline run",
     description=(
-        "Queues `daily`, `close_day` or `warehouse` for a past service date (default: "
-        "yesterday). The worker "
+        "Queues `daily` or `close_day` for a past service date (default: yesterday), or "
+        "`warehouse` for today or a past date (default: today). The worker "
         "picks it up; poll `GET /operator/runs/{run_id}`. 409 when one is already queued or "
         "running for the same job and date."
     ),
@@ -53,11 +53,16 @@ Now = Annotated[datetime, Depends(get_now)]
 async def post_run(request: Request, body: RunRequest, session: Session, now: Now) -> PipelineRun:
     settings: Settings = request.app.state.settings
     today = service_date(now, settings.tzinfo)
-    day = body.service_date or today - timedelta(days=1)
-    if day >= today:
-        raise RequestInvalid(
-            f"service_date must be before {today} (the service time zone's today)."
-        )
+    if body.job == "warehouse":  # the date only labels the run: today or a past date
+        day = body.service_date or today
+        if day > today:
+            raise RequestInvalid(f"service_date must not be after {today} for warehouse.")
+    else:
+        day = body.service_date or today - timedelta(days=1)
+        if day >= today:
+            raise RequestInvalid(
+                f"service_date must be before {today} (the service time zone's today)."
+            )
     if body.mode not in VALID_MODES[body.job]:
         raise RequestInvalid(f"mode {body.mode!r} is not valid for job {body.job}.")
     mode = "incremental" if body.job == "warehouse" and body.mode is None else body.mode

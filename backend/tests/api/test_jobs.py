@@ -593,6 +593,20 @@ async def test_post_run_passes_the_mode_and_validates_it(env: Env) -> None:
     assert (wh.status_code, wh.json()["mode"]) == (202, "incremental")
     full = await post_run(env.client, {"job": "warehouse", "mode": "full"}, OPERATOR)
     assert (full.status_code, full.json()["mode"]) == (202, "full")
+    assert full.json()["service_date"] == "2026-10-28"  # warehouse defaults to today
+
+
+async def test_warehouse_takes_today_or_the_past_but_never_the_future(env: Env) -> None:
+    today = await post_run(env.client, {"job": "warehouse", "service_date": "2026-10-28"}, OPERATOR)
+    assert today.status_code == 202
+    future = await post_run(
+        env.client, {"job": "warehouse", "service_date": "2026-10-29"}, OPERATOR
+    )
+    assert (future.status_code, future.json()["code"]) == (422, "validation-error")
+    # daily and close_day keep the past-date rule.
+    for job in ("daily", "close_day"):
+        r = await post_run(env.client, {"job": job, "service_date": "2026-10-28"}, OPERATOR)
+        assert r.status_code == 422
     for body in ({"job": "warehouse", "mode": "export"}, {"job": "close_day", "mode": "full"}):
         assert (await post_run(env.client, body, OPERATOR)).status_code == 422
     unknown = await post_run(env.client, {"job": "close_day", "colour": 1}, OPERATOR)

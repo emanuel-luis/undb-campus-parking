@@ -28,7 +28,11 @@ def _url() -> str:
 
 
 def include_name(name: str | None, type_: str, parent_names: object) -> bool:
-    """Alembic owns schema public only; dbt owns warehouse and warehouse_staging."""
+    """Keep autogenerate to schema public (dbt owns warehouse and warehouse_staging).
+
+    Alembic consults this filter for schemas only with include_schemas=True; without it, as
+    here, it compares the default schema alone. The filter keeps that true if someone turns
+    include_schemas on."""
     return type_ != "schema" or name is None or name == "public"
 
 
