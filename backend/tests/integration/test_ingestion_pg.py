@@ -1,6 +1,7 @@
 """Ingestion and occupancy on Postgres, on a schema built by the real migrations."""
 
 import asyncio
+import json
 import random
 from collections.abc import AsyncIterator, Callable
 from datetime import timedelta
@@ -109,6 +110,32 @@ async def test_ingest_and_availability(pg: tuple[httpx.AsyncClient, FastAPI]) ->
     assert page["items"][0]["payload"]["student_ref"] == "stu_ffffffffffff"
     health = (await client.get("/api/v1/operator/ingestion/health", headers=OPERATOR)).json()
     assert health["rejects_by_reason"] == {"unknown_student": 2}
+
+
+async def test_unstorable_strings_become_rejects_not_a_500(
+    pg: tuple[httpx.AsyncClient, FastAPI],
+) -> None:
+    client, app = pg
+    nul, lone = chr(0), chr(0xD800)
+    items = [
+        event(1),
+        event(2, gate_id=f"principal{nul}"),
+        event(3, student_ref=f"stu_0123456789a{nul}"),
+        event(4, student_ref=f"stu_{lone}"),
+        event(5) | {f"extra{nul}{lone}": f"v{lone}{nul}"},
+        event(6, gate_id=lone),
+        event(7, student=REF_B),
+    ]
+    r = await client.post(
+        URL,
+        content=json.dumps(items).encode(),
+        headers={**INGEST, "Content-Type": "application/json"},
+    )
+    body = r.json()
+    assert (r.status_code, body["accepted"], body["rejected"]) == (202, 2, 5)
+    assert {x["reason"] for x in body["rejects"]} == {"schema_invalid"}
+    assert await rows(app, "SELECT count(*) FROM ingest_rejects") == [(5,)]
+    assert await occupancy_equals_recount(app) == {"principal": 2}
 
 
 async def test_events_are_append_only(pg: tuple[httpx.AsyncClient, FastAPI]) -> None:

@@ -119,16 +119,12 @@ def test_index_names_and_the_partial_index(pg_database: str) -> None:
     )
     names = {d.split()[0] for d in defs}
     assert {
-        "ix_gate_events_lot_id",
-        "ix_gate_events_student_ref",
-        "ix_gate_events_service_date",
+        "ix_gate_events_lot_id_student_ref_service_date",
         "ix_gate_events_service_date_lot_id",
         "ix_gate_events_received_at",
         "ix_ingest_batches_received_at",
         "ix_ingest_rejects_received_at",
-        "ix_stays_lot_id",
-        "ix_stays_student_ref",
-        "ix_stays_service_date",
+        "ix_stays_lot_id_student_ref_service_date",
         "ix_stays_updated_at",
         "ix_stays_lot_id_open",
     } <= names

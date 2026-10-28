@@ -76,7 +76,8 @@ def never_backwards(column: Any, value: datetime) -> Any:
 
 
 def create_engine(settings: Settings) -> AsyncEngine:
-    kwargs: dict[str, Any] = {}
+    # hide_parameters: a failing statement never logs the values bound to it.
+    kwargs: dict[str, Any] = {"hide_parameters": True}
     if not settings.database_url.startswith("sqlite"):
         kwargs["pool_pre_ping"] = True
     return create_async_engine(settings.database_url, **kwargs)
