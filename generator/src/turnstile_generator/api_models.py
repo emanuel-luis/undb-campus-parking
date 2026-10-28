@@ -241,7 +241,17 @@ class RejectPage(BaseModel):
 
 
 class RunRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
     job: Annotated[Literal['daily', 'close_day'], Field(title='Job')]
+    mode: Annotated[
+        Literal['export'] | None,
+        Field(
+            description='`export` re-exports the day without closing it (close_day only).',
+            title='Mode',
+        ),
+    ] = None
     service_date: Annotated[
         date | None,
         Field(
