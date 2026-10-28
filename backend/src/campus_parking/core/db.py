@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import Request
-from sqlalchemy import DateTime, MetaData
+from sqlalchemy import DateTime, MetaData, case, literal, or_
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.engine import Dialect
@@ -68,8 +68,16 @@ def insert_ignore(dialect_name: str, entity: type[Base]) -> Insert:
     raise NotImplementedError(f"insert_ignore does not support {dialect_name!r}")
 
 
+def never_backwards(column: Any, value: datetime) -> Any:
+    """SQL expression for `column = max(column, value)` that works on Postgres and SQLite."""
+    # Typed explicitly: an untyped datetime parameter would be bound as a naive timestamp.
+    bound = literal(value, UTCDateTime())
+    return case((or_(column.is_(None), column < bound), bound), else_=column)
+
+
 def create_engine(settings: Settings) -> AsyncEngine:
-    kwargs: dict[str, Any] = {}
+    # hide_parameters: a failing statement never logs the values bound to it.
+    kwargs: dict[str, Any] = {"hide_parameters": True}
     if not settings.database_url.startswith("sqlite"):
         kwargs["pool_pre_ping"] = True
     return create_async_engine(settings.database_url, **kwargs)

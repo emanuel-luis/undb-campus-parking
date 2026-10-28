@@ -1,5 +1,6 @@
 """Application factory. No work happens at import time: run with `uvicorn --factory`."""
 
+import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from importlib.metadata import PackageNotFoundError, version
@@ -17,6 +18,8 @@ from campus_parking.core.middleware import (
 from campus_parking.core.openapi import install_openapi
 from campus_parking.core.problems import register_problem_handlers
 from campus_parking.core.settings import Settings, get_settings
+from campus_parking.ingestion.router import router as ingestion_router
+from campus_parking.occupancy.router import router as occupancy_router
 from campus_parking.registry.router import router as registry_router
 
 TITLE = "UNDB Campus Parking API"
@@ -24,6 +27,9 @@ TAGS = [
     {"name": "health", "description": "Liveness and readiness probes."},
     {"name": "lots", "description": "Public lot registry: capacity and gates."},
     {"name": "admin", "description": "Registry writes (admin API key)."},
+    {"name": "availability", "description": "Free spaces per lot, derived from gate events."},
+    {"name": "ingestion", "description": "Gate-event intake (ingest API key)."},
+    {"name": "operator", "description": "Ingestion health and rejects (operator API key)."},
 ]
 
 
@@ -50,6 +56,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(title=TITLE, version=package_version(), openapi_tags=TAGS, lifespan=lifespan)
     app.state.settings = settings
     app.state.draining = False
+    # Per-process cap on batches in flight; the events route never waits for it.
+    app.state.ingest_semaphore = asyncio.Semaphore(settings.ingest_max_concurrency)
 
     # The last middleware added is the outermost one.
     app.add_middleware(UnhandledErrorMiddleware)
@@ -69,6 +77,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(metrics.router)
     api_v1 = APIRouter(prefix="/api/v1")
     api_v1.include_router(registry_router)
+    api_v1.include_router(ingestion_router)
+    api_v1.include_router(occupancy_router)
     app.include_router(api_v1)
     install_openapi(app)
     return app

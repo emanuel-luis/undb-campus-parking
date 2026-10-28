@@ -2,7 +2,12 @@
 
 from typing import Any
 
-from campus_parking.core.openapi import PROBLEM_MEDIA_TYPE, PROBLEM_REF, problem_media_types
+from campus_parking.core.openapi import (
+    PROBLEM_MEDIA_TYPE,
+    PROBLEM_REF,
+    problem_media_types,
+    problem_validation_errors,
+)
 from campus_parking.main import create_app
 from tests.conftest import make_settings
 
@@ -48,3 +53,50 @@ def test_other_bodies_are_left_alone() -> None:
 def test_document_is_cached() -> None:
     app = create_app(make_settings())
     assert app.openapi() is app.openapi()
+
+
+def test_default_422_bodies_become_problems() -> None:
+    doc = create_app(make_settings()).openapi()
+    for path, method in [
+        ("/api/v1/lots/{lot_id}/availability", "get"),
+        ("/api/v1/operator/rejects", "get"),
+        ("/api/v1/operator/ingestion/health", "get"),
+    ]:
+        response = doc["paths"][path][method]["responses"]["422"]
+        assert response["content"] == {PROBLEM_MEDIA_TYPE: {"schema": {"$ref": PROBLEM_REF}}}
+    assert "HTTPValidationError" not in doc["components"]["schemas"]
+    assert "ValidationError" not in doc["components"]["schemas"]
+    assert "HTTPValidationError" not in str(doc)
+
+
+def test_framework_schemas_stay_while_something_still_uses_them() -> None:
+    ref = "#/components/schemas/HTTPValidationError"
+    schema = {
+        "paths": {
+            "/a": {
+                "get": {
+                    "responses": {
+                        "422": {"content": {"application/json": {"schema": {"$ref": ref}}}}
+                    }
+                }
+            },
+            "/b": {
+                "get": {
+                    "responses": {
+                        "400": {"content": {"application/json": {"schema": {"$ref": ref}}}}
+                    }
+                }
+            },
+        },
+        "components": {
+            "schemas": {
+                "HTTPValidationError": {
+                    "properties": {"d": {"items": {"$ref": "#/components/schemas/ValidationError"}}}
+                },
+                "ValidationError": {"type": "object"},
+            }
+        },
+    }
+    out = problem_validation_errors(schema)
+    assert list(out["paths"]["/a"]["get"]["responses"]["422"]["content"]) == [PROBLEM_MEDIA_TYPE]
+    assert set(out["components"]["schemas"]) == {"HTTPValidationError", "ValidationError"}
