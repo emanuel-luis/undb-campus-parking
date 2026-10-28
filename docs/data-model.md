@@ -72,7 +72,12 @@ for transactions that committed after a later one.
   the watermark is rebuilt whole. Stays of a student-day are deleted and re-inserted when one of
   its events arrives, so a stay id can disappear; replacing the partition leaves no orphans.
 - `fct_occupancy_snapshot`: the same changed partitions (watermark: max `built_at`), the day after
-  each (stays that cross midnight), and yesterday and today for every lot (the clock moves).
+  each (stays that cross midnight), and yesterday and today for every lot (the clock moves). A
+  stay open for several days and reconciled later is corrected on the days in between by the
+  nightly full refresh.
+
+The marts' lot-day spine comes from the snapshots, which need a capacity version covering the
+date: events before a lot's first `valid_from` stay out of the marts.
 
 The worker runs `dbt build` every 15 minutes and `dbt source freshness` plus
 `dbt build --full-refresh` at the end of the daily run, so a missed partition lives at most a day.
@@ -81,8 +86,8 @@ The worker runs `dbt build` every 15 minutes and `dbt source freshness` plus
 
 Per lot, every stay with an entry adds +1 at `entered_at` and -1 at `ended_at` (never while it is
 open); exit-only stays never held a space we saw. Slot boundaries are points of the same series,
-so each constant segment falls inside one slot. Per slot: `occupied_end` is the level at the slot
-end, `occupied_max` the highest level, `occupied_avg` the time-weighted mean, `seconds_full` the
+so each constant segment falls inside one slot. Per slot: `occupied_end` is the level of the
+slot's last segment (a change stamped exactly on the slot end belongs to the next slot), `occupied_max` the highest level, `occupied_avg` the time-weighted mean, `seconds_full` the
 time with level >= capacity, and `free_*` capacity minus those, never below 0. Slots that have
 not started are not built; the current one ends now. A dbt unit test pins the arithmetic.
 
@@ -108,4 +113,5 @@ Keys (`unique`, `not_null`, `unique_combination`), `relationships` from facts an
 dimensions, `accepted_values` on status, direction, hour and bucket; singular tests: occupancy
 never negative and free never above capacity, mart entries and exits equal the fact per
 lot-day, and every stays partition of the source equals the fact's (catches a missed
-incremental partition); the `occupancy_step_function` unit test.
+incremental partition; only dates before today whose source stays did not change after the build,
+because the worker tests while ingestion writes); the `occupancy_step_function` unit test.

@@ -176,6 +176,7 @@ segments as (
         slots.service_date,
         slots.slot_key,
         slots.capacity,
+        levels.at,
         levels.level,
         extract(epoch from least(levels.next_at, slots.slot_end) - levels.at) as seconds
 
@@ -198,6 +199,9 @@ per_slot as (
         service_date,
         slot_key,
         max(level) as occupied_max,
+        -- The level of the slot's last segment: a change stamped exactly on the slot end
+        -- belongs to the next slot.
+        (array_agg(level order by at desc))[1] as occupied_end,
         sum(level * seconds) / nullif(sum(seconds), 0) as occupied_avg,
         sum(case when level >= capacity then seconds else 0 end) as seconds_full
 
@@ -213,11 +217,11 @@ select
     {{ date_key('slots.service_date') }} as date_key,
     slots.slot_key,
     slots.slot_start,
-    cast(ends.level as integer) as occupied_end,
+    cast(per_slot.occupied_end as integer) as occupied_end,
     cast(per_slot.occupied_max as integer) as occupied_max,
     cast(round(cast(per_slot.occupied_avg as numeric), 2) as numeric(10, 2)) as occupied_avg,
     slots.capacity,
-    cast(greatest(slots.capacity - ends.level, 0) as integer) as free_end,
+    cast(greatest(slots.capacity - per_slot.occupied_end, 0) as integer) as free_end,
     cast(greatest(slots.capacity - per_slot.occupied_max, 0) as integer) as free_min,
     cast(round(per_slot.seconds_full) as integer) as seconds_full,
     clock.as_of as built_at
@@ -228,6 +232,3 @@ inner join per_slot
     on per_slot.lot_id = slots.lot_id
     and per_slot.service_date = slots.service_date
     and per_slot.slot_key = slots.slot_key
-inner join levels as ends
-    on ends.lot_id = slots.lot_id
-    and ends.at = slots.slot_end
