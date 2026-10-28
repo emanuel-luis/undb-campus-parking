@@ -7,7 +7,7 @@ contract: when code and plan disagree, fix one of them in the same PR.
 
 ## Shape
 
-- **Backend** (`backend/`, uv project `smart-parking`, package `smart_parking`): one FastAPI app,
+- **Backend** (`backend/`, uv project `campus-parking`, package `campus_parking`): one FastAPI app,
   one `/api/v1` surface, one Alembic history, one image, run as two processes: `api` (uvicorn) and
   `worker` (reconciliation, Parquet export, dbt refresh; every run in `pipeline_runs`).
 - **Generator** (`generator/`, uv project `turnstile-generator`, package `turnstile_generator`): the
@@ -28,9 +28,9 @@ backend/
   openapi.json                 committed contract (source for generator models and TS client)
   alembic/versions/            0001_registry_ingestion_occupancy, 0002_jobs
   warehouse/                   dbt project
-  src/smart_parking/
+  src/campus_parking/
     main.py        create_app(settings) + lifespan (engine, hub, poller, draining flag)
-    cli.py         smart-parking serve | worker [--once JOB] | migrate | openapi | close-day | export | warehouse
+    cli.py         campus-parking serve | worker [--once JOB] | migrate | openapi | close-day | export | warehouse
     core/          settings, db (async engine, UTC type, insert_ignore), logging (JSON),
                    middleware (request id, HTTP metrics), problems (RFC 9457), security (3 API-key
                    deps), clock (get_now, service_date, cutoff), health router, metrics, openapi.py
@@ -223,7 +223,7 @@ ignore older versions, REST fallback every 10 s while down, close when hidden or
 
 ## Worker
 
-`smart-parking worker`: one asyncio process, one job at a time.
+`campus-parking worker`: one asyncio process, one job at a time.
 
 - Claim loop every `PARKING_WORKER_POLL_S` (2 s): `UPDATE pipeline_runs SET status = 'running' …
   WHERE run_id = (SELECT … WHERE status = 'queued' ORDER BY requested_at FOR UPDATE SKIP LOCKED
