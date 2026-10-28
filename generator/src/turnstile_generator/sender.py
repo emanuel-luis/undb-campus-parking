@@ -63,6 +63,8 @@ class Totals:
     duplicates: int = 0
     rejected: int = 0
     rejects_by_reason: Counter[str] = field(default_factory=Counter)
+    dropped: int = 0  # live mode: events the full outbox discarded
+    unsent: int = 0  # live mode: events still in the outbox at shutdown
 
     def add(self, result: IngestResult) -> None:
         self.received += result.received
@@ -119,6 +121,20 @@ class Outbox:
 
     def push(self, events: Sequence[GateEvent]) -> None:
         self._items.extend(events)
+        over = len(self._items) - self.max_size
+        if over > 0:
+            for _ in range(over):
+                self._items.popleft()
+            self.dropped += over
+            log.warning("outbox full, dropped oldest events", extra={"dropped": over})
+
+    def requeue(self, batch: Sequence[GateEvent]) -> None:
+        """Put an undelivered batch back at the front, in its original order.
+
+        The outbox always drops its oldest events when over the bound, so after a requeue the
+        oldest events of the requeued batch are the ones discarded; newer events are kept.
+        """
+        self._items.extendleft(reversed(batch))
         over = len(self._items) - self.max_size
         if over > 0:
             for _ in range(over):

@@ -69,7 +69,9 @@ async def main(first_log: str, rerun_log: str) -> None:
             events == first["accepted"],
             f"gate_events ({events}) = accepted reported ({first['accepted']})",
         )
-        expect(events > 1000, "the backfill produced a realistic volume")
+        # A 7-day window is at least ~3k events even when it holds a holiday and a quiet
+        # semester week, so 1500 leaves margin yet still catches an empty or broken backfill.
+        expect(events > 1500, f"the backfill produced a realistic volume ({events})")
         expect(
             rerun["accepted"] == 0
             and rerun["duplicates"] == first["accepted"] + first["duplicates"],

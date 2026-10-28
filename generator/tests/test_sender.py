@@ -126,6 +126,15 @@ def test_send_all_batches_and_totals():
     assert totals.received == 25 and totals.accepted == 25
 
 
+def test_requeue_restores_order_at_the_front_and_trims_the_oldest():
+    box = Outbox(5)
+    events = [_event(i) for i in range(8)]
+    box.push(events[4:7])
+    box.requeue(events[0:3])  # fits exactly: 3 + 3 > 5, so the oldest one goes
+    assert box.dropped == 1
+    assert box.pop_batch(10) == events[1:3] + events[4:7]
+
+
 def test_outbox_drops_oldest_when_full(caplog):
     box = Outbox(3)
     events = [_event(i) for i in range(5)]
