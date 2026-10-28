@@ -32,7 +32,7 @@ jobs:
       - name: Sync the backend environment
         run: uv sync --locked --project backend
       - name: Ruff, mypy and the OpenAPI drift check
-        run: make lint
+        run: make backend-lint
 
   backend-test:
     name: backend test (pytest, coverage gate)
@@ -51,7 +51,7 @@ jobs:
       - name: Sync the backend environment
         run: uv sync --locked --project backend
       - name: Pytest with the 85% coverage gate
-        run: make test
+        run: make backend-test
 
   backend-integration:
     name: backend integration (Postgres)
@@ -87,3 +87,118 @@ jobs:
         run: uv sync --locked --project backend
       - name: Integration tests against Postgres
         run: make test-integration
+
+  generator-lint:
+    name: generator lint (ruff, mypy, models drift)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          enable-cache: true
+          cache-dependency-glob: generator/uv.lock
+          python-version: "3.12"
+      - name: Sync the generator environment
+        run: uv sync --locked --project generator
+      - name: Ruff, mypy and the generated-models drift check
+        run: make generator-lint
+
+  generator-test:
+    name: generator test (pytest, coverage gate)
+    needs: generator-lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          enable-cache: true
+          cache-dependency-glob: generator/uv.lock
+          python-version: "3.12"
+      - name: Sync the generator environment
+        run: uv sync --locked --project generator
+      - name: Pytest with the 85% coverage gate
+        run: make generator-test
+
+  generator-e2e:
+    name: generator end to end (backend + Postgres)
+    needs: [generator-lint]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash # with pipefail, so a failing backfill is not hidden behind tee
+    services:
+      postgres:
+        image: postgres:17.11-alpine # keep in sync with compose.yaml
+        env:
+          POSTGRES_USER: parking
+          POSTGRES_PASSWORD: parking
+          POSTGRES_DB: parking
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U parking -d parking"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      PARKING_ENV: test
+      PARKING_DATABASE_URL: postgresql+asyncpg://parking:parking@localhost:5432/parking
+      GENERATOR_API_URL: http://127.0.0.1:8000
+      GENERATOR_STUDENTS: "10000"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          enable-cache: true
+          cache-dependency-glob: |
+            backend/uv.lock
+            generator/uv.lock
+          python-version: "3.12"
+      - name: Sync both environments
+        run: |
+          uv sync --locked --project backend
+          uv sync --locked --project generator
+      - name: Generate ephemeral API keys
+        run: |
+          # Random per run, masked in the logs, never stored. The generator holds the same
+          # ingest and admin keys as the backend, under its own prefix.
+          for role in INGEST ADMIN OPERATOR; do
+            key="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"
+            echo "::add-mask::$key"
+            echo "PARKING_${role}_API_KEY=$key" >> "$GITHUB_ENV"
+            if [ "$role" != OPERATOR ]; then echo "GENERATOR_${role}_API_KEY=$key" >> "$GITHUB_ENV"; fi
+          done
+      - name: Apply the migrations
+        run: uv run --project backend campus-parking migrate
+      - name: Start the API
+        run: |
+          nohup uv run --project backend campus-parking serve --host 127.0.0.1 --port 8000             > "$RUNNER_TEMP/api.log" 2>&1 &
+          for _ in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:8000/readyz > /dev/null 2>&1; then exit 0; fi
+            sleep 1
+          done
+          echo "the API did not become ready" >&2
+          tail -n 50 "$RUNNER_TEMP/api.log" >&2
+          exit 1
+      - name: Bootstrap the registry
+        run: uv run --project generator turnstile-gen bootstrap
+      - name: Backfill two days
+        run: uv run --project generator turnstile-gen backfill --days 2 2>&1 | tee "$RUNNER_TEMP/backfill-1.log"
+      - name: Backfill the same two days again (must be all duplicates)
+        run: uv run --project generator turnstile-gen backfill --days 2 2>&1 | tee "$RUNNER_TEMP/backfill-2.log"
+      - name: Check what the backend holds
+        run: >-
+          uv run --project backend python scripts/e2e_check.py
+          "$RUNNER_TEMP/backfill-1.log" "$RUNNER_TEMP/backfill-2.log"
+      - name: API log on failure
+        if: failure()
+        run: tail -n 100 "$RUNNER_TEMP/api.log" || true
