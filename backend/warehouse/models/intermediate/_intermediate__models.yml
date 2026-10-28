@@ -1,0 +1,16 @@
+version: 2
+
+models:
+  - name: int_stays_classified
+    description: >
+      Grain: one stay (stay_id). Adds the duration bucket (closed stays only: <30m, 30-60m,
+      1-2h, 2-4h, 4-6h, >6h), entry and exit flags, and the lot capacity in force on the
+      service date (NULL before the lot's first capacity version).
+    columns:
+      - name: stay_id
+        data_tests: [unique, not_null]
+      - name: duration_bucket
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['<30m', '30-60m', '1-2h', '2-4h', '4-6h', '>6h']

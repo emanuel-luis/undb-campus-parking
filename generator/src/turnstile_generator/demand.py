@@ -12,8 +12,8 @@ WEEKDAY_FACTOR = (1.0, 1.0, 1.0, 1.0, 1.0, 0.35, 0.05)
 HOLIDAY_FACTOR = 0.1
 QUIET_WEEK_FACTOR = 0.25
 
-# Approximate 2026 national and São Luís holidays. Mirrored by the dbt holidays seed (PR 7), so
-# keep it in this one constant. Not an official calendar.
+# Approximate 2026 national and São Luís holidays, mirrored by the dbt seed
+# backend/warehouse/seeds/holidays.csv (a test compares them). Not an official calendar.
 HOLIDAYS_2026: dict[date, str] = {
     date(2026, 1, 1): "Confraternização Universal",
     date(2026, 2, 16): "Carnaval",

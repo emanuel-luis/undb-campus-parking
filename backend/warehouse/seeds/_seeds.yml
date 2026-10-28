@@ -1,0 +1,14 @@
+version: 2
+
+seeds:
+  - name: holidays
+    description: >
+      Synthetic holiday calendar, one row per date. The same dates as HOLIDAYS_2026 in
+      generator/src/turnstile_generator/demand.py (a generator test compares them). Approximate,
+      not an official calendar.
+    columns:
+      - name: holiday_date
+        description: The holiday, a local date. Primary key.
+        data_tests: [unique, not_null]
+      - name: holiday_name
+        description: Name in Portuguese.
