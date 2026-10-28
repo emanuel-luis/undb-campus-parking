@@ -125,9 +125,17 @@ async def test_events_are_append_only(pg: tuple[httpx.AsyncClient, FastAPI]) -> 
 
 
 async def test_concurrent_overlapping_batches_match_a_recount(
-    pg: tuple[httpx.AsyncClient, FastAPI],
+    migrated: str, client_for: Any
 ) -> None:
-    client, app = pg
+    # A concurrency limit above the batch count, so every batch reaches the database at once
+    # and they contend on the lot locks (the 429 path has its own tests).
+    app = build_app(migrated, ingest_max_concurrency=8)
+    async with client_for(app) as client:
+        await seed_registry(client, capacity=3000)
+        await _post_overlapping_batches(client, app)
+
+
+async def _post_overlapping_batches(client: httpx.AsyncClient, app: FastAPI) -> None:
     students = [REF_A, REF_B, REF_C]
     n = iter(range(1, 10_000))
     batches = []
