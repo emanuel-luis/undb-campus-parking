@@ -59,7 +59,7 @@ async def reconcile_day(
                 .where(Stay.service_date == day, Stay.status == "open")
                 .group_by(Stay.lot_id)
             )
-        ).tuples()
+        ).all()
     )
     await session.execute(
         update(Stay)
@@ -77,12 +77,10 @@ async def reconcile_day(
             await session.execute(
                 select(Stay.lot_id, func.count()).where(Stay.status == "open").group_by(Stay.lot_id)
             )
-        ).tuples()
+        ).all()
     )
     drift: dict[str, int] = {}
-    stored = dict(
-        (await session.execute(select(LotOccupancy.lot_id, LotOccupancy.occupied))).tuples()
-    )
+    stored = dict((await session.execute(select(LotOccupancy.lot_id, LotOccupancy.occupied))).all())
     for lot_id in sorted(stored):
         closed_here = open_on_day.get(lot_id, 0)
         actual = recount.get(lot_id, 0)
@@ -117,7 +115,7 @@ async def reconcile_day(
                 .where(Stay.service_date == day)
                 .group_by(Stay.status)
             )
-        ).tuples()
+        ).all()
     )
     await session.merge(ServiceDay(service_date=day, closed_at=now, run_id=run_id))
     await session.commit()
@@ -182,7 +180,7 @@ async def pending_days(session: AsyncSession, settings: Settings, now: datetime)
     today = service_date(now, settings.tzinfo)
     floor = today - timedelta(days=settings.max_event_age_days)
     closed = dict(
-        (await session.execute(select(ServiceDay.service_date, ServiceDay.closed_at))).tuples()
+        (await session.execute(select(ServiceDay.service_date, ServiceDay.closed_at))).all()
     )
     with_events = await session.scalars(
         select(GateEventRow.service_date)
@@ -202,7 +200,7 @@ async def pending_days(session: AsyncSession, settings: Settings, now: datetime)
                 .where(GateEventRow.received_at > since, GateEventRow.service_date >= floor)
                 .group_by(GateEventRow.service_date)
             )
-        ).tuples()
+        ).all()
         pending |= {
             d for d, received in newest if d in inside and received > inside[d] - RECEIVED_SLACK
         }
