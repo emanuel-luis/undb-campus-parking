@@ -1,0 +1,51 @@
+name: security
+
+# Supply-chain checks: known vulnerabilities in what the uv locks pin (pip-audit) and in the
+# workflows themselves (zizmor).
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 6 * * 1" # weekly: new advisories against unchanged dependencies
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  pip-audit:
+    name: pip-audit (known vulnerabilities in backend/uv.lock)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with: { python-version: "3.12" }
+      # Every package backend/uv.lock pins, for every extra and group, with hashes: pip-audit
+      # checks exactly that set and resolves nothing itself.
+      - run: uv export --project backend --frozen --all-extras --all-groups --no-emit-project -o "$RUNNER_TEMP/locked.txt"
+      - run: uvx pip-audit==2.10.1 --disable-pip --progress-spinner off -r "$RUNNER_TEMP/locked.txt"
+
+  zizmor:
+    name: zizmor (GitHub Actions workflows)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with: { python-version: "3.12" }
+      - name: Audit the workflows (fails on a finding of medium severity or higher)
+        run: uvx zizmor==1.31.1 --format=github --min-severity=medium .github/workflows
+        env:
+          # the online audits: impostor commits, known-vulnerable actions, stale refs
+          GH_TOKEN: ${{ github.token }}
