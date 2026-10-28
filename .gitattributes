@@ -3,6 +3,8 @@ Makefile text eol=lf
 *.sh text eol=lf
 *.d2 text eol=lf
 *.py text eol=lf
+# Written with LF by `campus-parking openapi`; make openapi-check compares the bytes.
+backend/openapi.json text eol=lf
 *.parquet binary
 *.png binary
 # Rendered diagrams: keep the bytes D2 writes (no EOL conversion, so make diagrams-check compares
