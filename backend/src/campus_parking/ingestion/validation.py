@@ -9,6 +9,7 @@ from uuid import UUID
 from pydantic import ValidationError
 
 from campus_parking.ingestion.contract import GateEvent
+from campus_parking.ingestion.sanitize import clean
 
 RejectReason = Literal[
     "schema_invalid",
@@ -43,7 +44,7 @@ class Reject:
 
 def _text(raw: Any, key: str) -> str | None:
     value = raw.get(key) if isinstance(raw, dict) else None
-    return value[:MAX_ID] if isinstance(value, str) else None
+    return clean(value[:MAX_ID]) if isinstance(value, str) else None
 
 
 def _event_id(raw: Any) -> UUID | None:
@@ -56,7 +57,7 @@ def _event_id(raw: Any) -> UUID | None:
 def _schema_detail(exc: ValidationError) -> str:
     first = exc.errors(include_input=False, include_url=False)[0]
     where = ".".join(str(p) for p in first["loc"]) or "item"
-    return f"{where}: {first['msg']}"[:MAX_DETAIL]
+    return str(clean(f"{where}: {first['msg']}"))[:MAX_DETAIL]
 
 
 def validate_item(

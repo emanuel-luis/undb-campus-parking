@@ -67,9 +67,11 @@ def upgrade() -> None:
         ),
         sa.PrimaryKeyConstraint("event_id", name=op.f("pk_gate_events")),
     )
-    op.create_index("ix_gate_events_lot_id", "gate_events", ["lot_id"])
-    op.create_index("ix_gate_events_student_ref", "gate_events", ["student_ref"])
-    op.create_index("ix_gate_events_service_date", "gate_events", ["service_date"])
+    op.create_index(
+        "ix_gate_events_lot_id_student_ref_service_date",
+        "gate_events",
+        ["lot_id", "student_ref", "service_date"],
+    )
     op.create_index("ix_gate_events_service_date_lot_id", "gate_events", ["service_date", "lot_id"])
     op.create_index("ix_gate_events_received_at", "gate_events", ["received_at"])
 
@@ -130,9 +132,11 @@ def upgrade() -> None:
         sa.UniqueConstraint("entry_event_id", name=op.f("uq_stays_entry_event_id")),
         sa.UniqueConstraint("exit_event_id", name=op.f("uq_stays_exit_event_id")),
     )
-    op.create_index("ix_stays_lot_id", "stays", ["lot_id"])
-    op.create_index("ix_stays_student_ref", "stays", ["student_ref"])
-    op.create_index("ix_stays_service_date", "stays", ["service_date"])
+    op.create_index(
+        "ix_stays_lot_id_student_ref_service_date",
+        "stays",
+        ["lot_id", "student_ref", "service_date"],
+    )
     op.create_index("ix_stays_updated_at", "stays", ["updated_at"])
     op.create_index(
         "ix_stays_lot_id_open", "stays", ["lot_id"], postgresql_where=OPEN, sqlite_where=OPEN

@@ -1,11 +1,13 @@
-"""Properties 1 and 8 against the real IngestionService on in-memory SQLite (few examples)."""
+"""Properties 1, 8 and 10 against the real IngestionService on in-memory SQLite (few examples)."""
 
 import asyncio
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from typing import Any
+from uuid import UUID
 
 from hypothesis import HealthCheck, given, settings
+from hypothesis import strategies as st
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -137,3 +139,61 @@ def test_8_resending_everything_changes_nothing(data: tuple[list[Ev], list[list[
     assert before == after
     assert all(r.accepted == 0 and r.rejected == 0 for r in results)
     assert sum(r.duplicates for r in results) == sum(len(b) for b in batches)
+
+
+BREAKS: list[dict[str, Any]] = [
+    {},
+    {"gate_id": "ghost-gate"},
+    {"student_ref": "stu_ffffffffffff"},
+    {"lot_id": "lot-b"},
+    {"direction": "exit"},
+    {"occurred_at": "2026-10-28T15:00:00Z"},
+    {"occurred_at": "2025-01-01T00:00:00Z"},
+    {"schema_version": 9},
+]
+
+
+@st.composite
+def broken_batch(draw: st.DrawFn) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Items with unique ids and one flaw each (or none), and the same items shuffled."""
+    flaws = draw(st.lists(st.sampled_from(BREAKS), min_size=1, max_size=12))
+    items = [
+        {
+            "schema_version": 1,
+            "event_id": str(UUID(int=i + 1)),
+            "gate_id": "lot-a-in",
+            "lot_id": "lot-a",
+            "direction": "entry",
+            "student_ref": STUDENTS[i % len(STUDENTS)],
+            "occurred_at": "2026-10-28T13:50:00Z",
+            **flaw,
+        }
+        for i, flaw in enumerate(flaws)
+    ]
+    return items, draw(st.permutations(items))
+
+
+async def outcomes(
+    sessions: async_sessionmaker[AsyncSession], cfg: Any, items: list[dict[str, Any]]
+) -> dict[str, str]:
+    async with sessions() as session:
+        result = await IngestionService(session, cfg).ingest(items, NOW)
+    reasons = {str(r.event_id): r.reason for r in result.rejects}
+    return {i["event_id"]: reasons.get(i["event_id"], "accepted") for i in items}
+
+
+@PROFILE
+@given(broken_batch())
+def test_10_outcome_per_event_does_not_depend_on_batch_order(
+    data: tuple[list[dict[str, Any]], list[dict[str, Any]]],
+) -> None:
+    items, shuffled = data
+
+    async def run_with(order: list[dict[str, Any]]) -> dict[str, str]:
+        async def body(sessions: async_sessionmaker[AsyncSession], cfg: Any) -> dict[str, str]:
+            return await outcomes(sessions, cfg, order)
+
+        result: dict[str, str] = await with_service(body)
+        return result
+
+    assert asyncio.run(run_with(shuffled)) == asyncio.run(run_with(items))

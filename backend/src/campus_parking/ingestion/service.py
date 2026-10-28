@@ -2,6 +2,7 @@
 
 import json
 import logging
+import re
 import time
 from dataclasses import dataclass
 from datetime import datetime
@@ -17,10 +18,12 @@ from campus_parking.core.settings import Settings
 from campus_parking.ingestion.contract import GateEvent, payload_hash
 from campus_parking.ingestion.models import IngestBatch
 from campus_parking.ingestion.repository import IngestionRepository
+from campus_parking.ingestion.sanitize import clean
 from campus_parking.ingestion.schemas import IngestResult, RejectItem
 from campus_parking.ingestion.validation import KnownGate, Reject, validate_item
 from campus_parking.occupancy.repository import OccupancyRepository
 from campus_parking.occupancy.service import apply_touched
+from campus_parking.registry.models import SLUG_PATTERN, STUDENT_REF_PATTERN
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +43,7 @@ def is_lock_timeout(exc: DBAPIError) -> bool:
 
 def capped_payload(raw: Any) -> Any:
     """The item as received, or a marker when it would not fit the 4 KB cap (or is not JSON)."""
+    raw = clean(raw)
     try:
         text = json.dumps(raw, allow_nan=False)
     except ValueError:
@@ -63,9 +67,15 @@ class _Rejected:
     raw: Any
 
 
-def _strings(raw_items: list[Any], key: str) -> set[str]:
+def _ids(raw_items: list[Any], key: str, pattern: str) -> set[str]:
+    """Well-formed ids only: anything else cannot match a row and fails validation as
+    schema_invalid, so it never reaches the lookups (NUL or lone surrogates would break them)."""
     return {
-        item[key] for item in raw_items if isinstance(item, dict) and isinstance(item.get(key), str)
+        item[key]
+        for item in raw_items
+        if isinstance(item, dict)
+        and isinstance(item.get(key), str)
+        and re.fullmatch(pattern, item[key])
     }
 
 
@@ -89,9 +99,9 @@ class IngestionService:
         batch_id = uuid4()
 
         await repo.set_lock_timeout(cfg.ingest_lock_timeout_ms)
-        gates = await repo.gates(_strings(raw_items, "gate_id"))
+        gates = await repo.gates(_ids(raw_items, "gate_id", SLUG_PATTERN))
         known_gates = {g.gate_id: KnownGate(g.lot_id, g.direction) for g in gates.values()}
-        students = await repo.known_students(_strings(raw_items, "student_ref"))
+        students = await repo.known_students(_ids(raw_items, "student_ref", STUDENT_REF_PATTERN))
 
         candidates: list[_Candidate] = []
         rejected: list[_Rejected] = []

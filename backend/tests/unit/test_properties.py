@@ -1,9 +1,10 @@
-"""Hypothesis properties 1-6 and 8-10 of the plan, against a pure in-memory model.
+"""Hypothesis properties 1-6, 8 and 9 of the plan, against a pure in-memory model.
 
 The model folds batches the way the ingest transaction does: dedupe by event id, re-derive the
 stays of every touched (lot, student, service day) with `pair_stays`, add the change in open
 stays to the lot's counter. Properties 1 and 8 are repeated against the real service in
-test_ingestion_properties.py. Property 7 (close_day) belongs to a later PR.
+test_ingestion_properties.py, together with property 10.
+Property 7 (close_day) belongs to a later PR.
 """
 
 from collections import Counter
@@ -17,7 +18,6 @@ from hypothesis import given, settings
 from hypothesis import strategies as st
 
 from campus_parking.core.clock import service_date
-from campus_parking.ingestion.validation import KnownGate, Reject, validate_item
 from campus_parking.occupancy.domain import lot_figures
 from campus_parking.occupancy.pairing import StayEvent, StayRecord, pair_stays
 
@@ -242,63 +242,6 @@ def test_9_free_stays_within_zero_and_capacity(capacity: int | None, occupied: i
     assert 0 <= free <= capacity
     assert over is (occupied > capacity)
     assert pct == round(occupied / capacity * 100, 1)
-
-
-GATES = {"lot-a-in": KnownGate("lot-a", "entry"), "lot-a-out": KnownGate("lot-a", "exit")}
-KNOWN = {STUDENTS[0], STUDENTS[1]}
-ITEM = {
-    "schema_version": 1,
-    "event_id": str(UUID(int=1)),
-    "gate_id": "lot-a-in",
-    "lot_id": "lot-a",
-    "direction": "entry",
-    "student_ref": STUDENTS[0],
-    "occurred_at": "2026-10-28T13:50:00Z",
-}
-
-
-@st.composite
-def raw_items(draw: st.DrawFn) -> list[Any]:
-    """Valid items plus one broken field each, so every reason shows up."""
-    breaks: list[dict[str, Any]] = [
-        {},
-        {"gate_id": "ghost-gate"},
-        {"student_ref": STUDENTS[3]},
-        {"lot_id": "lot-b"},
-        {"direction": "exit"},
-        {"occurred_at": "2026-10-28T15:00:00Z"},
-        {"occurred_at": "2025-01-01T00:00:00Z"},
-        {"schema_version": 9},
-    ]
-    items: list[Any] = [
-        {**ITEM, "event_id": str(UUID(int=i + 1)), **draw(st.sampled_from(breaks))}
-        for i in range(draw(st.integers(1, 12)))
-    ]
-    return [*items, None, 5, []]
-
-
-def outcome(item: Any) -> str:
-    result = validate_item(item, GATES, KNOWN, BASE, 300, 120)
-    return result.reason if isinstance(result, Reject) else "ok"
-
-
-@PROFILE
-@given(raw_items(), st.randoms(use_true_random=False))
-def test_10_validation_does_not_depend_on_position(items: list[Any], rnd: Any) -> None:
-    expected = [outcome(i) for i in items]
-    order = list(range(len(items)))
-    rnd.shuffle(order)
-    shuffled = [outcome(items[i]) for i in order]
-    assert shuffled == [expected[i] for i in order]
-    assert set(expected) - {"ok"} <= {
-        "unknown_gate",
-        "unknown_student",
-        "lot_mismatch",
-        "direction_mismatch",
-        "in_future",
-        "too_old",
-        "schema_invalid",
-    }
 
 
 def test_the_strategies_reach_the_interesting_cases() -> None:

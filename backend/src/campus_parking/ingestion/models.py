@@ -42,9 +42,12 @@ class GateEventRow(Base):
 
     __tablename__ = "gate_events"
     __table_args__ = (
-        Index("ix_gate_events_lot_id", "lot_id"),
-        Index("ix_gate_events_student_ref", "student_ref"),
-        Index("ix_gate_events_service_date", "service_date"),
+        Index(
+            "ix_gate_events_lot_id_student_ref_service_date",
+            "lot_id",
+            "student_ref",
+            "service_date",
+        ),
         Index("ix_gate_events_service_date_lot_id", "service_date", "lot_id"),
         Index("ix_gate_events_received_at", "received_at"),
     )

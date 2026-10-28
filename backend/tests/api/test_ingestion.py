@@ -1,4 +1,5 @@
 import asyncio
+import json
 from collections.abc import AsyncIterator, Callable
 from typing import Any
 
@@ -157,6 +158,33 @@ async def test_non_object_items_are_schema_invalid(client: httpx.AsyncClient) ->
     assert sorted(map(repr, (i["payload"] for i in page["items"]))) == sorted(
         map(repr, [None, 5, "x", []])
     )
+
+
+async def test_unstorable_strings_become_rejects_not_a_500(client: httpx.AsyncClient) -> None:
+    nul, lone = chr(0), chr(0xD800)
+    first = [
+        event(1),
+        event(2, gate_id=f"principal{nul}"),
+        event(3, student_ref=f"stu_0123456789a{nul}"),
+        event(5) | {f"extra{nul}{lone}": f"v{lone}{nul}"},
+    ]
+    second = [event(7, student=REF_B), event(4, student_ref=f"stu_{lone}"), event(6, gate_id=lone)]
+    bodies = []
+    for items in (first, second):
+        raw = json.dumps(items).encode()  # ASCII escapes: the NUL and surrogate reach the server
+        headers = {**INGEST, "Content-Type": "application/json"}
+        r = await client.post(URL, content=raw, headers=headers)
+        assert r.status_code == 202
+        bodies.append(r.json())
+    assert [b["accepted"] for b in bodies] == [1, 1]
+    assert [b["rejected"] for b in bodies] == [3, 2]
+    assert {x["reason"] for b in bodies for x in b["rejects"]} == {"schema_invalid"}
+    page = (await client.get("/api/v1/operator/rejects", headers=OPERATOR)).json()
+    stored = json.dumps(page)
+    assert chr(92) + "u0000" not in stored
+    assert chr(92) + "ud800" not in stored
+    assert len(page["items"]) == 5
+    assert (await lot(client))["occupied"] == 2
 
 
 async def test_rejects_never_fail_the_batch(client: httpx.AsyncClient) -> None:

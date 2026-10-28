@@ -28,9 +28,7 @@ class Stay(Base):
             "status IN ('open', 'closed', 'missing_exit', 'exit_only', 'closed_by_reconciliation')",
             name="status_valid",
         ),
-        Index("ix_stays_lot_id", "lot_id"),
-        Index("ix_stays_student_ref", "student_ref"),
-        Index("ix_stays_service_date", "service_date"),
+        Index("ix_stays_lot_id_student_ref_service_date", "lot_id", "student_ref", "service_date"),
         Index("ix_stays_updated_at", "updated_at"),
         Index("ix_stays_lot_id_open", "lot_id", postgresql_where=_OPEN, sqlite_where=_OPEN),
     )
