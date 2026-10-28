@@ -99,6 +99,23 @@ class DayNotClosed(DomainError):
     title = "The service day is not over"
 
 
+class InvalidDateRange(DomainError):
+    code = "invalid-date-range"
+    status = 422
+    title = "Invalid date range"
+
+
+class WarehouseNotReady(DomainError):
+    """The warehouse marts do not exist yet (dbt has not built them)."""
+
+    code = "warehouse-not-ready"
+    status = 503
+    title = "The warehouse is not ready"
+
+    def __init__(self, detail: str | None = None) -> None:
+        super().__init__(detail, headers={"Retry-After": "60"})
+
+
 class ServiceDraining(DomainError):
     code = "service-draining"
     status = 503
