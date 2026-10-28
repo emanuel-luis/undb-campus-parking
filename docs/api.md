@@ -29,7 +29,10 @@ Because each message is complete, a slow client may lose older queued messages (
 
 ### Close codes
 
-- 1001 (going away): the server is shutting down. Reconnect with backoff.
+- 1001 (going away): the server is shutting down. Reconnect with backoff. The `campus-parking
+  serve` command sends this itself before uvicorn stops. A server stopped some other way (for
+  example plain `uvicorn --factory`) is closed by uvicorn with 1012 (service restart), so clients
+  may see 1012 as well; the reconnect rule below applies to any close code.
 - 1013 (try again later): the process is at `PARKING_LIVE_MAX_CONNECTIONS`. Reconnect with
   backoff, preferably after a longer pause.
 
@@ -37,7 +40,7 @@ The server also sends protocol pings every 20 seconds (uvicorn default).
 
 ### Client rules
 
-1. Reconnect after any close or error with exponential backoff from 1 s to 30 s, with random
+1. Reconnect after any close code or error with exponential backoff from 1 s to 30 s, with random
    jitter. Reset the backoff after a message arrives.
 2. If no message arrives for 45 seconds (three missed heartbeats), close the socket and
    reconnect.
@@ -46,4 +49,4 @@ The server also sends protocol pings every 20 seconds (uvicorn default).
 5. Close the socket when the page is hidden or the app is in the background; open it again, and
    take a fresh snapshot, when it returns.
 
-The shared client in `packages/api-client` (`live.ts`) implements these rules for web and mobile.
+The shared client in `packages/api-client` (`live.ts`, added in a later PR) will implement these rules for web and mobile.
