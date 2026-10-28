@@ -191,10 +191,10 @@ jobs:
           exit 1
       - name: Bootstrap the registry
         run: uv run --project generator turnstile-gen bootstrap
-      - name: Backfill two days
-        run: uv run --project generator turnstile-gen backfill --days 2 2>&1 | tee "$RUNNER_TEMP/backfill-1.log"
-      - name: Backfill the same two days again (must be all duplicates)
-        run: uv run --project generator turnstile-gen backfill --days 2 2>&1 | tee "$RUNNER_TEMP/backfill-2.log"
+      - name: Backfill seven days
+        run: uv run --project generator turnstile-gen backfill --days 7 2>&1 | tee "$RUNNER_TEMP/backfill-1.log"
+      - name: Backfill the same seven days again (must be all duplicates)
+        run: uv run --project generator turnstile-gen backfill --days 7 2>&1 | tee "$RUNNER_TEMP/backfill-2.log"
       - name: Check what the backend holds
         run: >-
           uv run --project backend python scripts/e2e_check.py

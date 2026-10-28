@@ -119,7 +119,7 @@ def test_live_keeps_batches_when_the_backend_is_down_and_bounds_the_outbox(setti
     specs = registry.desired_lots(TODAY)
     totals = run_live(
         Sender(client, sleeper=clock.sleep),
-        settings.model_copy(update={"outbox_max": 10}),
+        settings.model_copy(update={"outbox_max": 3}),
         specs,
         scenario="rush_hour",
         rate_multiplier=1.0,
@@ -128,6 +128,7 @@ def test_live_keeps_batches_when_the_backend_is_down_and_bounds_the_outbox(setti
         sleeper=clock.sleep,
     )
     assert totals.received == 0
+    assert totals.dropped > 0 and totals.unsent <= 3
 
 
 def test_heartbeat_and_healthcheck(tmp_path, monkeypatch: pytest.MonkeyPatch):

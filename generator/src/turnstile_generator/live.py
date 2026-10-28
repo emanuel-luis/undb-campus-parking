@@ -75,7 +75,7 @@ def run_live(
             try:
                 result = sender.send(batch) if attempts is None else sender.send(batch, attempts)
             except GiveUpError:
-                outbox.push(batch)  # keep it for the next flush; the outbox bound drops the oldest
+                outbox.requeue(batch)  # retry at the next flush; a full outbox drops the oldest
                 log.warning(
                     "batch not delivered, kept in the outbox", extra={"outbox": len(outbox)}
                 )
@@ -138,5 +138,6 @@ def run_live(
 
     outbox.push([e for _, _, e in sorted(held)])
     flush(SHUTDOWN_ATTEMPTS)
+    totals.dropped, totals.unsent = outbox.dropped, len(outbox)
     log.info("live stopped", extra={"outbox": len(outbox), "dropped": outbox.dropped})
     return totals
