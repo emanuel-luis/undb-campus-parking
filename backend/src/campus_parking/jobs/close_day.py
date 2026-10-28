@@ -19,10 +19,6 @@ from campus_parking.occupancy.models import LotOccupancy, Stay
 from campus_parking.occupancy.repository import OccupancyRepository
 from campus_parking.registry.models import Lot
 
-# An ingest request takes its `received_at` before it waits for a lot lock (at most the lock
-# timeout), so an event can be stamped a little before the close that it still lands after.
-RECEIVED_SLACK = timedelta(seconds=5)
-
 
 @dataclass(frozen=True)
 class Reconciled:
@@ -137,6 +133,15 @@ async def export_into(
 ) -> dict[str, Any]:
     """Export the day and record what was exported in the run result."""
     exports = await export_day(sessionmaker, settings.lake_dir, settings.tzinfo, day, run_id)
+    exported_events = next(e.rows for e in exports if e.dataset == "gate_events")
+    async with sessionmaker() as session:
+        # Only after a successful publish: a failed export leaves the date pending.
+        await session.execute(
+            update(ServiceDay)
+            .where(ServiceDay.service_date == day)
+            .values(exported_events=exported_events)
+        )
+        await session.commit()
     by_dataset = {e.dataset: e for e in exports}
     events, rejects = by_dataset["gate_events"], by_dataset["ingest_rejects"]
     result.rows_written = events.rows + rejects.rows
@@ -175,33 +180,32 @@ async def close_day(
 
 
 async def pending_days(session: AsyncSession, settings: Settings, now: datetime) -> list[date]:
-    """Dates `daily` must close, oldest first, within the event age limit: yesterday, past dates
-    with events that were never closed, and closed dates that got events after their close."""
+    """Dates `daily` must close, oldest first, within the event age limit: yesterday if it was
+    never closed, and every past date whose stored events are not exactly what its last
+    successful export took (`exported_events`). gate_events is append-only, so the count is
+    exact: no timestamp comparison can lose a late event."""
     today = service_date(now, settings.tzinfo)
     floor = today - timedelta(days=settings.max_event_age_days)
-    closed = dict(
-        (await session.execute(select(ServiceDay.service_date, ServiceDay.closed_at))).all()
-    )
-    with_events = await session.scalars(
-        select(GateEventRow.service_date)
-        .where(GateEventRow.service_date >= floor, GateEventRow.service_date < today)
-        .distinct()
-    )
-    pending = {d for d in with_events if d not in closed}
-    if today - timedelta(days=1) not in closed:
-        pending.add(today - timedelta(days=1))
-    inside = {d: at for d, at in closed.items() if d >= floor}
-    if inside:
-        # received_at is indexed: only events newer than the oldest close are looked at.
-        since = min(inside.values()) - RECEIVED_SLACK
-        newest = (
+    counts = dict(
+        (
             await session.execute(
-                select(GateEventRow.service_date, func.max(GateEventRow.received_at))
-                .where(GateEventRow.received_at > since, GateEventRow.service_date >= floor)
+                select(GateEventRow.service_date, func.count())
+                .where(GateEventRow.service_date >= floor, GateEventRow.service_date < today)
                 .group_by(GateEventRow.service_date)
             )
         ).all()
-        pending |= {
-            d for d, received in newest if d in inside and received > inside[d] - RECEIVED_SLACK
-        }
+    )
+    exported = dict(
+        (
+            await session.execute(
+                select(ServiceDay.service_date, ServiceDay.exported_events).where(
+                    ServiceDay.service_date >= floor
+                )
+            )
+        ).all()
+    )
+    pending = {d for d, n in counts.items() if exported.get(d) != n}
+    pending |= {d for d, n in exported.items() if n is None}
+    if today - timedelta(days=1) not in exported:
+        pending.add(today - timedelta(days=1))
     return sorted(pending)

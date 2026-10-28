@@ -125,16 +125,15 @@ def _export_sync(
 
 
 async def _read_events(session: AsyncSession, day: date) -> tuple[list[dict[str, Any]], int]:
-    # One statement, so the rows and the source count come from the same snapshot.
+    # The count is its own statement; the caller runs both in one transaction on one snapshot.
+    source = await session.scalar(
+        select(func.count()).select_from(GateEventRow).where(GateEventRow.service_date == day)
+    )
     stmt = (
-        select(GateEventRow, func.count().over())
-        .where(GateEventRow.service_date == day)
-        .order_by(GateEventRow.event_id)
+        select(GateEventRow).where(GateEventRow.service_date == day).order_by(GateEventRow.event_id)
     )
     out: list[dict[str, Any]] = []
-    total = 0
-    for row, count in await session.execute(stmt):
-        total = count
+    for row in await session.scalars(stmt):
         out.append(
             {
                 "schema_version": row.schema_version,
@@ -150,22 +149,18 @@ async def _read_events(session: AsyncSession, day: date) -> tuple[list[dict[str,
                 "payload_sha256": row.payload_sha256,
             }
         )
-    return out, total
+    return out, source or 0
 
 
 async def _read_rejects(
     session: AsyncSession, day: date, tz: ZoneInfo
 ) -> tuple[list[dict[str, Any]], int]:
     start, end = day_cutoff(day - timedelta(days=1), tz), day_cutoff(day, tz)
-    stmt = (
-        select(IngestReject, func.count().over())
-        .where(IngestReject.received_at >= start, IngestReject.received_at < end)
-        .order_by(IngestReject.reject_id)
-    )
+    window = (IngestReject.received_at >= start, IngestReject.received_at < end)
+    total = await session.scalar(select(func.count()).select_from(IngestReject).where(*window))
+    stmt = select(IngestReject).where(*window).order_by(IngestReject.reject_id)
     out: list[dict[str, Any]] = []
-    total = 0
-    for row, count in await session.execute(stmt):
-        total = count
+    for row in await session.scalars(stmt):
         out.append(
             {
                 "reject_id": row.reject_id,
@@ -180,7 +175,7 @@ async def _read_rejects(
                 "payload_json": json.dumps(row.payload, sort_keys=True),
             }
         )
-    return out, total
+    return out, total or 0
 
 
 async def export_day(
@@ -192,6 +187,9 @@ async def export_day(
 ) -> list[DatasetExport]:
     """Export both datasets of `day`; the Arrow and file work runs in a worker thread."""
     async with sessionmaker() as session:
+        if session.get_bind().dialect.name == "postgresql":
+            # One snapshot for both datasets, so each count matches the rows read after it.
+            await session.connection(execution_options={"isolation_level": "REPEATABLE READ"})
         events, event_source = await _read_events(session, day)
         rejects, reject_source = await _read_rejects(session, day, tz)
     return await asyncio.to_thread(

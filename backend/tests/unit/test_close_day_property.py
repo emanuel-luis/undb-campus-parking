@@ -1,4 +1,5 @@
-"""Property 7: close_day is idempotent, on the pure model of test_properties.py."""
+"""Property 7 on the pure model of test_properties.py: close_day is idempotent. The SQL path is
+covered by test_rerun_changes_nothing in tests/api/test_jobs.py."""
 
 from collections import Counter
 from datetime import date
