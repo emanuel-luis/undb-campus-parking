@@ -32,11 +32,18 @@ AFTER = NOW + timedelta(days=1)
 
 
 @pytest.fixture
-async def pg(
-    pg_database: str, client_for: Callable[[Any], Any], tmp_path: Path
-) -> AsyncIterator[tuple[httpx.AsyncClient, FastAPI, Worker]]:
+def migrated(pg_database: str) -> str:
+    # Sync on purpose: alembic's async env.py calls asyncio.run, which cannot run inside the
+    # event loop of an async fixture.
     command.upgrade(alembic_config(), "head")
-    app = build_app(pg_database, lake_dir=tmp_path / "lake", worker_heartbeat_file=tmp_path / "hb")
+    return pg_database
+
+
+@pytest.fixture
+async def pg(
+    migrated: str, client_for: Callable[[Any], Any], tmp_path: Path
+) -> AsyncIterator[tuple[httpx.AsyncClient, FastAPI, Worker]]:
+    app = build_app(migrated, lake_dir=tmp_path / "lake", worker_heartbeat_file=tmp_path / "hb")
     async with client_for(app) as client:
         await seed_registry(client, capacity=3000)
         yield client, app, Worker(app.state.settings, app.state.sessionmaker, lambda: AFTER)
