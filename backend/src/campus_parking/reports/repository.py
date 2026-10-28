@@ -46,16 +46,25 @@ async def lot_exists(session: AsyncSession, lot_id: str) -> bool:
     return await session.scalar(select(Lot.lot_id).where(Lot.lot_id == lot_id)) is not None
 
 
-def _missing_table(exc: DBAPIError) -> bool:
-    text = f"{type(exc.orig).__name__} {exc.orig}"
-    return "no such table" in text or "UndefinedTable" in text or "does not exist" in text
+# undefined_table and invalid_schema_name; any other error (a missing column, say) is a 500.
+MISSING_RELATION = {"42P01", "3F000"}
+
+
+def missing_table(exc: DBAPIError) -> bool:
+    """A mart or the warehouse schema does not exist (Postgres SQLSTATE, SQLite message)."""
+    orig = exc.orig
+    for candidate in (orig, getattr(orig, "__cause__", None)):
+        code = getattr(candidate, "sqlstate", None) or getattr(candidate, "pgcode", None)
+        if code in MISSING_RELATION:
+            return True
+    return "no such table" in str(orig)
 
 
 async def _rows(session: AsyncSession, stmt: Select[Any]) -> Sequence[Row]:
     try:
         result = await session.execute(stmt)
     except DBAPIError as exc:
-        if _missing_table(exc):
+        if missing_table(exc):
             raise WarehouseNotReady("The warehouse marts have not been built yet.") from exc
         raise
     return [dict(r) for r in result.mappings()]

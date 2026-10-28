@@ -46,7 +46,10 @@ def _range_doc(max_days: int) -> str:
 
 
 RANGE_DOC = _range_doc(MAX_DAYS)
-ERRORS = problem_responses(404, 422, 503)
+ERRORS: dict[int | str, dict[str, Any]] = {
+    304: {"description": "Not Modified: the ETag sent in If-None-Match still matches."},
+    **problem_responses(404, 422, 503),
+}
 
 
 def get_service(

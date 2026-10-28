@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+from collections import OrderedDict
 from collections.abc import Awaitable, Callable, Sequence
 from datetime import date, datetime, timedelta
 from typing import Any
@@ -17,6 +18,7 @@ DEFAULT_DAYS = 30
 MAX_DAYS = 366
 MAX_HOURLY_DAYS = 31
 CACHE_ENTRIES = 512
+CACHE_BYTES = 32 * 1024 * 1024
 
 
 def resolve_range(
@@ -24,7 +26,10 @@ def resolve_range(
 ) -> tuple[date, date]:
     """Defaults: `end` today, `start` 29 days before `end` (30 days). Inclusive on both ends."""
     end = end or today
-    start = start or end - timedelta(days=DEFAULT_DAYS - 1)
+    try:
+        start = start or end - timedelta(days=DEFAULT_DAYS - 1)
+    except OverflowError:
+        raise InvalidDateRange(f"There are not {DEFAULT_DAYS} days before {end}.") from None
     if start > end:
         raise InvalidDateRange(f"from ({start}) is after to ({end}).")
     if (end - start).days + 1 > max_days:
@@ -47,24 +52,38 @@ def matches(if_none_match: str | None, tag: str) -> bool:
 class ReportCache:
     """Encoded report bodies of one warehouse run; emptied when a newer run succeeds.
 
-    No TTL: a body only changes when the warehouse does. Capped by clearing, which is cheap to
-    refill (each report is one query)."""
+    No TTL: a body only changes when the warehouse does. Bounded by entries and total bytes,
+    evicting the least recently used body (each report is one query to refill)."""
 
-    def __init__(self, max_entries: int = CACHE_ENTRIES) -> None:
+    def __init__(self, max_entries: int = CACHE_ENTRIES, max_bytes: int = CACHE_BYTES) -> None:
         self.max_entries = max_entries
+        self.max_bytes = max_bytes
         self.run_id: str | None = None
-        self.entries: dict[str, bytes] = {}
+        self.entries: OrderedDict[str, bytes] = OrderedDict()
+        self.size = 0
 
     def get(self, run_id: str, key: str) -> bytes | None:
         if run_id != self.run_id:
             self.entries.clear()
+            self.size = 0
             self.run_id = run_id
-        return self.entries.get(key)
+        body = self.entries.get(key)
+        if body is not None:
+            self.entries.move_to_end(key)
+        return body
 
     def put(self, key: str, body: bytes) -> None:
-        if len(self.entries) >= self.max_entries:
-            self.entries.clear()
+        if len(body) > self.max_bytes:
+            return
+        if key in self.entries:
+            self.size -= len(self.entries.pop(key))
+        while self.entries and (
+            len(self.entries) >= self.max_entries or self.size + len(body) > self.max_bytes
+        ):
+            _, old = self.entries.popitem(last=False)
+            self.size -= len(old)
         self.entries[key] = body
+        self.size += len(body)
 
 
 class ReportService:
@@ -79,8 +98,8 @@ class ReportService:
         return ReportFreshness(
             last_run_id=run.run_id if run else None,
             finished_at=finished,
-            mode=run.mode if run else None,
-            status=status,
+            mode="full" if run and run.mode == "full" else "incremental" if run else None,
+            status=status,  # type: ignore[arg-type]
             age_s=(now - finished).total_seconds() if finished else None,
         )
 
