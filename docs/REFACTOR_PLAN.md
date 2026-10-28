@@ -98,7 +98,7 @@ Alembic owns schema `public`; dbt owns `warehouse` and `warehouse_staging`.
 ### Registry rules
 
 Lot and gate ids are stable natural keys; no deletes (append-only events reference them). A gate's
-`lot_id` and `direction` cannot change once it has events (409 `gate-immutable`). A lot PUT
+`lot_id` and `direction` cannot change once the gate exists (409 `gate-immutable`; DECISIONS 32). A lot PUT
 replaces its name and its whole capacity history (same body, same state).
 
 ## Ingestion
