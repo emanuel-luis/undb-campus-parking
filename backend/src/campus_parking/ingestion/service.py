@@ -187,7 +187,7 @@ class IngestionService:
                 (c.event.lot_id, c.event.student_ref, service_date(c.event.occurred_at, cfg.tzinfo))
                 for c in accepted
             }
-            deltas = await apply_touched(self.session, keys, received_at)
+            deltas = await apply_touched(self.session, keys, received_at, cfg.tzinfo)
             newest = _latest([(c.event.lot_id, c.event.occurred_at) for c in accepted])
             await occupancy.apply_changes(deltas, newest, received_at)
 

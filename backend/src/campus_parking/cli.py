@@ -1,11 +1,13 @@
-"""Command line entry point: `campus-parking <command>`. Later PRs add worker, close-day, ..."""
+"""Command line entry point: `campus-parking <command>`."""
 
 import argparse
+import asyncio
 import json
 import os
 import socket
 import sys
 from collections.abc import Callable, Sequence
+from datetime import date
 from pathlib import Path
 from types import FrameType
 
@@ -16,6 +18,7 @@ from fastapi import FastAPI
 from alembic import command
 from campus_parking.core.logging import configure_logging
 from campus_parking.core.settings import get_settings
+from campus_parking.jobs.worker import run_once, run_worker
 from campus_parking.main import create_app
 
 
@@ -86,6 +89,28 @@ def _migrate(args: argparse.Namespace) -> int:
     return 0
 
 
+def _run_job(job: str, day: date | None) -> int:
+    settings = get_settings()
+    configure_logging(settings)
+    return asyncio.run(run_once(settings, job, day))
+
+
+def _close_day(args: argparse.Namespace) -> int:
+    return _run_job("close_day", args.date)
+
+
+def _export(args: argparse.Namespace) -> int:
+    return _run_job("export", args.date)
+
+
+def _worker(args: argparse.Namespace) -> int:
+    if args.once:
+        return _run_job(args.once, args.date)
+    settings = get_settings()
+    configure_logging(settings)
+    return asyncio.run(run_worker(settings))
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="campus-parking")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -105,6 +130,24 @@ def build_parser() -> argparse.ArgumentParser:
         "--config", type=Path, help="alembic.ini to use (default: $ALEMBIC_INI or backend/)"
     )
     migrate.set_defaults(func=_migrate)
+
+    def add_date(p: argparse.ArgumentParser, help_text: str) -> None:
+        p.add_argument("--date", type=date.fromisoformat, metavar="YYYY-MM-DD", help=help_text)
+
+    close_day = sub.add_parser("close-day", help="close one past service day and export it")
+    add_date(close_day, "service date (default: yesterday in the service time zone)")
+    close_day.set_defaults(func=_close_day)
+
+    export = sub.add_parser("export", help="re-export one past service day to the Parquet lake")
+    add_date(export, "service date (default: yesterday in the service time zone)")
+    export.set_defaults(func=_export)
+
+    worker = sub.add_parser("worker", help="run the batch worker (claims runs from the queue)")
+    worker.add_argument(
+        "--once", choices=["daily", "close_day"], help="run this job now, then exit"
+    )
+    add_date(worker, "with --once: the service date (default: yesterday)")
+    worker.set_defaults(func=_worker)
     return parser
 
 

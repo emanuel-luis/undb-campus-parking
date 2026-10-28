@@ -48,7 +48,8 @@ class Settings(BaseSettings):
     warehouse_interval_min: int = Field(15, gt=0)
     daily_run_at: time = time(0, 30)
     worker_poll_s: float = Field(2.0, gt=0)
-    worker_metrics_port: int = Field(9100, gt=0, lt=65536)
+    worker_metrics_port: int = Field(9100, ge=0, lt=65536)  # 0 turns the exporter off
+    worker_heartbeat_file: Path = Path("/tmp/worker-heartbeat")
 
     # Readiness probe: give up on the database check after this many seconds.
     readiness_timeout_s: float = Field(2.0, gt=0)

@@ -63,6 +63,13 @@ live_connections = Gauge(
     "parking_live_connections", "Open live-availability WebSocket connections.", registry=registry
 )
 
+pipeline_runs_total = Counter(
+    "parking_pipeline_runs_total",
+    "Finished pipeline runs, by job and final status.",
+    ["job", "status"],
+    registry=registry,
+)
+
 router = APIRouter()
 
 

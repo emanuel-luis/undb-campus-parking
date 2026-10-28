@@ -79,6 +79,26 @@ class RequestInvalid(DomainError):
     title = "Validation error"
 
 
+class RunAlreadyActive(DomainError):
+    code = "run-already-active"
+    status = 409
+    title = "A run is already queued or running"
+
+
+class RunNotFound(DomainError):
+    code = "run-not-found"
+    status = 404
+    title = "Run not found"
+
+
+class DayNotClosed(DomainError):
+    """close_day for a date that is not over yet in the service time zone."""
+
+    code = "day-not-closed"
+    status = 409
+    title = "The service day is not over"
+
+
 class ServiceDraining(DomainError):
     code = "service-draining"
     status = 503

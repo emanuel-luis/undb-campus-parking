@@ -144,6 +144,26 @@ class MinuteCount(BaseModel):
     rejected: Annotated[int, Field(title='Rejected')]
 
 
+class PipelineRunOut(BaseModel):
+    error: Annotated[str | None, Field(title='Error')]
+    finished_at: Annotated[AwareDatetime | None, Field(title='Finished At')]
+    job: Annotated[Literal['daily', 'close_day', 'warehouse'], Field(title='Job')]
+    metrics: Annotated[dict[str, Any] | None, Field(title='Metrics')]
+    mode: Annotated[str | None, Field(title='Mode')]
+    parent_run_id: Annotated[UUID | None, Field(title='Parent Run Id')]
+    requested_at: Annotated[AwareDatetime, Field(title='Requested At')]
+    rows_read: Annotated[int | None, Field(title='Rows Read')]
+    rows_rejected: Annotated[int | None, Field(title='Rows Rejected')]
+    rows_written: Annotated[int | None, Field(title='Rows Written')]
+    run_id: Annotated[UUID, Field(title='Run Id')]
+    service_date: Annotated[date, Field(title='Service Date')]
+    started_at: Annotated[AwareDatetime | None, Field(title='Started At')]
+    status: Annotated[
+        Literal['queued', 'running', 'succeeded', 'failed'], Field(title='Status')
+    ]
+    trigger: Annotated[Literal['schedule', 'operator', 'cli'], Field(title='Trigger')]
+
+
 class Problem(BaseModel):
     code: Annotated[str, Field(title='Code')]
     detail: Annotated[str, Field(title='Detail')]
@@ -218,6 +238,27 @@ class RejectPage(BaseModel):
             title='Next Cursor',
         ),
     ]
+
+
+class RunRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    job: Annotated[Literal['daily', 'close_day'], Field(title='Job')]
+    mode: Annotated[
+        Literal['export'] | None,
+        Field(
+            description='`export` re-exports the day without closing it (close_day only).',
+            title='Mode',
+        ),
+    ] = None
+    service_date: Annotated[
+        date | None,
+        Field(
+            description='A past local date; defaults to yesterday in the service time zone.',
+            title='Service Date',
+        ),
+    ] = None
 
 
 class StudentRef(RootModel[str]):
