@@ -18,6 +18,9 @@ def make_settings(**overrides: Any) -> Settings:
         "env": "test",
         "database_url": "sqlite+aiosqlite:///:memory:",
         "cors_origins": [ORIGIN],
+        # The poller shares the single in-memory SQLite connection with the request under test:
+        # keep it quiet unless a test asks for it.
+        "live_poll_interval_s": 3600,
     }
     return Settings(_env_file=None, **{**base, **overrides})  # type: ignore[call-arg]
 

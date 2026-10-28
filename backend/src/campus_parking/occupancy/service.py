@@ -84,6 +84,9 @@ class OccupancyService:
             )
         return out
 
+    async def versions(self) -> dict[str, int]:
+        return await self.repo.versions()
+
     async def snapshot(self, now: datetime) -> AvailabilitySnapshot:
         return AvailabilitySnapshot(generated_at=now, lots=await self._availability(now, None))
 
