@@ -15,7 +15,11 @@ class RunRequest(BaseModel):
 
     job: JobName
     service_date: date | None = Field(
-        None, description="A past local date; defaults to yesterday in the service time zone."
+        None,
+        description=(
+            "daily and close_day: a past local date, default yesterday. warehouse: today or a "
+            "past date (it only labels the run), default today. Service time zone."
+        ),
     )
     mode: Literal["export", "incremental", "full"] | None = Field(
         None,

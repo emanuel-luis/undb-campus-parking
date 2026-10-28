@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 WarehouseMode = Literal["incremental", "full"]
 MODES: tuple[WarehouseMode, ...] = ("incremental", "full")
-TERMINATE_GRACE_S = 10.0
+TERMINATE_GRACE_S = 4.0  # worker grace (25 s) + this stays under 30 s
 FAILED = {"error", "fail", "runtime error"}
 OUTPUT_TAIL = 20
 # dbt-core has no `python -m dbt`; its CLI module runs as a script.
@@ -133,13 +133,17 @@ async def run_warehouse(settings: Settings, mode: WarehouseMode, result: RunResu
     project = settings.dbt_project_dir.resolve()
     env = dbt_env(settings.database_url, os.environ)
     result.metrics["mode"] = mode
+    target = project / "target"
     for args in dbt_commands(settings, mode):
+        # A dbt that crashes must not leave the previous run's results to be read as its own.
+        for stale in ("run_results.json", "sources.json"):
+            (target / stale).unlink(missing_ok=True)
         code, tail = await run_dbt(args, project, env)
         if args[0] == "source":
-            sources = _read_json(project / "target" / "sources.json")
+            sources = _read_json(target / "sources.json")
             result.metrics["freshness"] = freshness_status(sources) if sources else "unknown"
             continue
-        run_results = _read_json(project / "target" / "run_results.json")
+        run_results = _read_json(target / "run_results.json")
         summary = summarize(run_results) if run_results else {"failed": []}
         result.metrics.update(summary)
         result.rows_written = summary.get("rows_affected")

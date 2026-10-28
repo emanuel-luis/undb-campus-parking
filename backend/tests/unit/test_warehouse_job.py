@@ -132,6 +132,27 @@ async def test_a_crash_without_run_results_fails_the_run(
         await warehouse.run_warehouse(settings, "incremental", RunResult())
 
 
+async def test_stale_artifacts_are_removed_before_each_command(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    target = tmp_path / "target"
+    target.mkdir()
+    (target / "run_results.json").write_text(json.dumps(RUN_RESULTS))
+    (target / "sources.json").write_text(json.dumps({"results": [{"status": "pass"}]}))
+
+    async def crash(args: list[str], cwd: Path, env: dict[str, str]) -> tuple[int, str]:
+        return 2, "boom"
+
+    monkeypatch.setattr(warehouse, "run_dbt", crash)
+    result = RunResult()
+    settings = make_settings(database_url=URL, dbt_project_dir=tmp_path)
+    with pytest.raises(warehouse.DbtFailed, match="no run_results"):
+        await warehouse.run_warehouse(settings, "full", result)
+    assert result.metrics["freshness"] == "unknown"  # not the stale "pass"
+    assert "nodes" not in result.metrics
+    assert not (target / "run_results.json").exists()
+
+
 async def test_run_dbt_returns_the_exit_code_and_output_tail(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
