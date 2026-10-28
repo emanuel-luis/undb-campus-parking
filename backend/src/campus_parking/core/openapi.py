@@ -87,6 +87,10 @@ def register_live_socket(schema: dict[str, Any], heartbeat_s: float) -> dict[str
             "heartbeat_s": heartbeat_s,
             "close_codes": {
                 "1001": "The server is shutting down; reconnect with backoff.",
+                "1012": (
+                    "The server restarted without the campus-parking CLI (plain uvicorn); "
+                    "reconnect with backoff."
+                ),
                 "1013": "Too many connections; try again later.",
             },
         }
