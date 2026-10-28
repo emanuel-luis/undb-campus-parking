@@ -82,6 +82,9 @@ class Poller:
             metrics.lot_occupied.labels(lot.lot_id).set(lot.occupied)
             if lot.capacity is not None:
                 metrics.lot_capacity.labels(lot.lot_id).set(lot.capacity)
+            else:  # capacity went back to none: no series rather than a stale one
+                with contextlib.suppress(KeyError):
+                    metrics.lot_capacity.remove(lot.lot_id)
         current = {lot.lot_id for lot in snapshot.lots}
         for gone in self._gauge_lots - current:
             for gauge in (metrics.lot_occupied, metrics.lot_capacity):

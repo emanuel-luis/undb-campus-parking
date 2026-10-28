@@ -82,6 +82,10 @@ async def test_gauges_follow_snapshots_and_forget_removed_lots() -> None:
     await poller.tick()
     assert metrics.registry.get_sample_value("parking_lot_occupied", {"lot": "gauge-a"}) == 4
     assert metrics.registry.get_sample_value("parking_lot_capacity", {"lot": "gauge-a"}) == 9
+    source.lots = [lot("gauge-a", 2, occupied=4, capacity=None)]
+    await poller.tick()
+    assert metrics.registry.get_sample_value("parking_lot_capacity", {"lot": "gauge-a"}) is None
+    assert metrics.registry.get_sample_value("parking_lot_occupied", {"lot": "gauge-a"}) == 4
     source.lots = []
     await poller.tick()
     assert metrics.registry.get_sample_value("parking_lot_occupied", {"lot": "gauge-a"}) is None

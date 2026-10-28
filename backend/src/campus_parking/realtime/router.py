@@ -2,6 +2,7 @@
 
 import asyncio
 import contextlib
+from typing import Any
 
 from fastapi import APIRouter, WebSocket
 from starlette.websockets import WebSocketDisconnect
@@ -43,19 +44,19 @@ async def live_availability(websocket: WebSocket) -> None:
         await websocket.close(GOING_AWAY if hub.closed else TRY_AGAIN_LATER)
         return
     metrics.live_connections.inc()
+    tasks: list[asyncio.Task[Any]] = []
     try:
         await websocket.send_text(snapshot_json(await source.snapshot()))
         sender = asyncio.create_task(_pump(websocket, queue))
-        receiver = asyncio.create_task(_discard(websocket))
-        await asyncio.wait({sender, receiver}, return_when=asyncio.FIRST_COMPLETED)
-        closing = sender.done() and sender.result()
-        for task in (sender, receiver):
-            task.cancel()
-        await asyncio.gather(sender, receiver, return_exceptions=True)
-        if closing:
+        tasks = [sender, asyncio.create_task(_discard(websocket))]
+        await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+        if sender.done() and sender.result():
             await websocket.close(GOING_AWAY)
     except (WebSocketDisconnect, RuntimeError):
         pass  # the client left while the first snapshot was being sent
     finally:
+        for task in tasks:  # also when this handler itself is cancelled
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
         hub.unsubscribe(queue)
         metrics.live_connections.dec()

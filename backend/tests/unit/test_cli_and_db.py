@@ -102,3 +102,28 @@ async def test_get_session_yields_session(app) -> None:  # type: ignore[no-untyp
         session = await anext(gen)
         assert (await session.execute(text("SELECT 1"))).scalar_one() == 1
         await gen.aclose()
+
+
+async def test_draining_server_closes_live_sockets_before_uvicorn_shuts_down(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from fastapi import FastAPI
+
+    from campus_parking.realtime.hub import Hub
+
+    app = FastAPI()
+    app.state.draining = False
+    app.state.hub = Hub(5)
+    queue = app.state.hub.subscribe()
+    assert queue is not None
+    order: list[str] = []
+
+    async def fake_shutdown(self: uvicorn.Server, sockets: object = None) -> None:
+        order.append(f"uvicorn draining={app.state.draining} closed={app.state.hub.closed}")
+
+    monkeypatch.setattr(uvicorn.Server, "shutdown", fake_shutdown)
+    server = cli.DrainingServer(uvicorn.Config(app), app)
+    await server.shutdown()
+    assert queue.get_nowait() is None  # the socket handler turns this into a 1001 close
+    assert order == ["uvicorn draining=True closed=True"]
+    await server.shutdown()  # idempotent
