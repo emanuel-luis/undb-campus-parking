@@ -79,3 +79,5 @@ markers = ["integration: needs a real Postgres (TEST_DATABASE_URL); deselected b
 
 [tool.coverage.run]
 branch = true
+# SQLAlchemy's async layer runs the sync core inside greenlets; without this their lines are lost.
+concurrency = ["greenlet", "thread"]
