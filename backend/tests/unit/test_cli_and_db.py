@@ -126,4 +126,6 @@ async def test_draining_server_closes_live_sockets_before_uvicorn_shuts_down(
     await server.shutdown()
     assert queue.get_nowait() is None  # the socket handler turns this into a 1001 close
     assert order == ["uvicorn draining=True closed=True"]
-    await server.shutdown()  # idempotent
+    app.state.hub.unsubscribe(queue)  # what the socket handler does on its way out
+    await server.shutdown()  # a second call is harmless and still reaches uvicorn
+    assert order == ["uvicorn draining=True closed=True"] * 2

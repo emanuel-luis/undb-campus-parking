@@ -148,6 +148,6 @@ def test_openapi_documents_the_socket(client: TestClient) -> None:
     (socket,) = schema["x-websockets"]
     assert socket["path"] == URL
     assert socket["message"] == {"$ref": "#/components/schemas/AvailabilitySnapshot"}
-    assert set(socket["close_codes"]) == {"1001", "1013"}
+    assert set(socket["close_codes"]) == {"1001", "1012", "1013"}
     assert socket["heartbeat_s"] == 30
     assert "AvailabilitySnapshot" in schema["components"]["schemas"]
