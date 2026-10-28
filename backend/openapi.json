@@ -994,7 +994,8 @@
           "job": {
             "enum": [
               "daily",
-              "close_day"
+              "close_day",
+              "warehouse"
             ],
             "title": "Job",
             "type": "string"
@@ -1002,14 +1003,18 @@
           "mode": {
             "anyOf": [
               {
-                "const": "export",
+                "enum": [
+                  "export",
+                  "incremental",
+                  "full"
+                ],
                 "type": "string"
               },
               {
                 "type": "null"
               }
             ],
-            "description": "`export` re-exports the day without closing it (close_day only).",
+            "description": "close_day: `export` re-exports the day without closing it. warehouse: `incremental` (default, `dbt build`) or `full` (`dbt source freshness` and `dbt build --full-refresh`). daily takes no mode.",
             "title": "Mode"
           },
           "service_date": {
@@ -1775,7 +1780,7 @@
         ]
       },
       "post": {
-        "description": "Queues `daily` or `close_day` for a past service date (default: yesterday). The worker picks it up; poll `GET /operator/runs/{run_id}`. 409 when one is already queued or running for the same job and date.",
+        "description": "Queues `daily`, `close_day` or `warehouse` for a past service date (default: yesterday). The worker picks it up; poll `GET /operator/runs/{run_id}`. 409 when one is already queued or running for the same job and date.",
         "operationId": "post_run_api_v1_operator_runs_post",
         "requestBody": {
           "content": {

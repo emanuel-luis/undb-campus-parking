@@ -151,7 +151,7 @@ async def test_post_run_needs_a_past_date(env: Env, day: str) -> None:
 
 
 async def test_post_run_rejects_other_jobs_and_unknown_run_is_404(env: Env) -> None:
-    assert (await post_run(env.client, {"job": "warehouse"}, OPERATOR)).status_code == 422
+    assert (await post_run(env.client, {"job": "nope"}, OPERATOR)).status_code == 422
     missing = await env.client.get(f"/api/v1/operator/runs/{uuid4()}", headers=OPERATOR)
     assert missing.status_code == 404
     assert missing.json()["code"] == "run-not-found"
@@ -383,12 +383,52 @@ async def test_run_direct_refuses_when_one_is_active(env: Env) -> None:
 
 
 async def test_unknown_job_fails_the_run(env: Env) -> None:
-    async with env.app.state.sessionmaker() as s:
-        run, _ = await queue.add_run(
-            s, job="warehouse", service_date=DAY, trigger="cli", now=NOW, status="running"
-        )
-    with pytest.raises(RuntimeError, match="not available"):
+    run = PipelineRun(run_id=uuid4(), job="nope", mode=None, service_date=DAY)
+    with pytest.raises(RuntimeError, match="unknown job"):
         await env.worker.execute(run)
+
+
+async def test_warehouse_runs_in_its_mode(env: Env, fake_dbt: list[str]) -> None:
+    await env.worker.run_direct("warehouse", DAY, mode="full")
+    await env.worker.run_direct("warehouse", DAY - timedelta(days=1))
+    assert fake_dbt == ["full", "incremental"]
+    runs = await env.runs("warehouse")
+    assert sorted(r.metrics["mode"] for r in runs) == ["full", "incremental"]
+    assert {r.status for r in runs} == {"succeeded"}
+
+
+async def test_daily_ends_with_a_full_warehouse_child(env: Env, fake_dbt: list[str]) -> None:
+    env.clock["now"] = AFTER
+    await env.worker.run_direct("daily", DAY)
+    parent = (await env.runs("daily"))[0]
+    (child,) = await env.runs("warehouse")
+    assert (child.mode, child.status, child.parent_run_id) == ("full", "succeeded", parent.run_id)
+    assert (parent.status, parent.metrics["warehouse"]) == ("succeeded", "succeeded")
+    assert fake_dbt == ["full"]
+
+
+async def test_a_failed_warehouse_child_fails_daily(
+    env: Env, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async def broken(*_: Any) -> None:
+        raise RuntimeError("dbt broke")
+
+    monkeypatch.setattr(worker_module, "run_warehouse", broken)
+    env.clock["now"] = AFTER
+    with pytest.raises(RuntimeError, match="warehouse refresh failed"):
+        await env.worker.run_direct("daily", DAY)
+    parent = (await env.runs("daily"))[0]
+    assert (parent.status, parent.metrics["warehouse"]) == ("failed", "failed")
+    (child,) = await env.runs("warehouse")
+    assert child.error == "RuntimeError: dbt broke"
+
+
+async def test_daily_skips_the_warehouse_child_when_one_is_active(env: Env) -> None:
+    async with env.app.state.sessionmaker() as s:
+        await queue.enqueue(s, "warehouse", DAY, "operator", NOW, "incremental")
+    env.clock["now"] = AFTER
+    await env.worker.run_direct("daily", DAY)
+    assert (await env.runs("daily"))[0].metrics["warehouse"] == "skipped"
 
 
 async def test_abandoned_runs_are_marked_failed_at_startup(env: Env) -> None:
@@ -409,12 +449,30 @@ async def test_tick_enqueues_daily_once_after_the_run_time(env: Env) -> None:
     before_time = datetime(2026, 10, 29, 3, 10, tzinfo=UTC)  # 00:10 local
     env.clock["now"] = before_time
     await env.worker.tick()
-    assert await env.runs() == []
+    assert await env.runs("daily") == []
     env.clock["now"] = datetime(2026, 10, 29, 3, 40, tzinfo=UTC)  # 00:40 local
     await env.worker.tick()
     await env.worker.tick()
-    (run,) = await env.runs()
+    (run,) = await env.runs("daily")
     assert (run.job, run.trigger, run.service_date) == ("daily", "schedule", DAY)
+
+
+async def test_tick_enqueues_the_warehouse_refresh_every_interval(env: Env) -> None:
+    await env.worker.tick()
+    (first,) = await env.runs("warehouse")
+    assert (first.mode, first.trigger, first.service_date) == ("incremental", "schedule", DAY)
+    env.clock["now"] = NOW + timedelta(minutes=14)
+    await env.worker.tick()  # not due yet
+    assert len(await env.runs("warehouse")) == 1
+    env.clock["now"] = NOW + timedelta(minutes=15)
+    await env.worker.tick()  # due, but the first one is still queued for the same date
+    assert len(await env.runs("warehouse")) == 1
+    async with env.app.state.sessionmaker() as s:
+        assert await queue.claim(s, NOW) is not None
+    await env.worker.execute((await env.runs("warehouse"))[0])
+    env.clock["now"] = NOW + timedelta(minutes=30)
+    await env.worker.tick()
+    assert len(await env.runs("warehouse")) == 2
 
 
 async def test_serve_claims_a_queued_run_and_stops(env: Env) -> None:
@@ -531,5 +589,11 @@ async def test_post_run_passes_the_mode_and_validates_it(env: Env) -> None:
     assert (
         await post_run(env.client, {"job": "close_day", "mode": "x"}, OPERATOR)
     ).status_code == 422
+    wh = await post_run(env.client, {"job": "warehouse", "service_date": "2026-10-26"}, OPERATOR)
+    assert (wh.status_code, wh.json()["mode"]) == (202, "incremental")
+    full = await post_run(env.client, {"job": "warehouse", "mode": "full"}, OPERATOR)
+    assert (full.status_code, full.json()["mode"]) == (202, "full")
+    for body in ({"job": "warehouse", "mode": "export"}, {"job": "close_day", "mode": "full"}):
+        assert (await post_run(env.client, body, OPERATOR)).status_code == 422
     unknown = await post_run(env.client, {"job": "close_day", "colour": 1}, OPERATOR)
     assert unknown.status_code == 422
