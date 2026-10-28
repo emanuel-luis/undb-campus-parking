@@ -6,6 +6,8 @@ from typing import Any
 
 from fastapi import Request
 from sqlalchemy import DateTime, MetaData
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.engine import Dialect
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -14,6 +16,7 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.sql.dml import Insert
 from sqlalchemy.types import TypeDecorator
 
 from campus_parking.core.settings import Settings
@@ -50,6 +53,19 @@ class UTCDateTime(TypeDecorator[datetime]):
         if value.tzinfo is None:
             return value.replace(tzinfo=UTC)
         return value.astimezone(UTC)
+
+
+def insert_ignore(dialect_name: str, entity: type[Base]) -> Insert:
+    """INSERT ... ON CONFLICT DO NOTHING for the dialects the project runs on.
+
+    Chain `.values(...)` and, when the caller needs the rows that were really inserted,
+    `.returning(...)`: skipped rows are not returned on either dialect.
+    """
+    if dialect_name == "postgresql":
+        return pg_insert(entity).on_conflict_do_nothing()
+    if dialect_name == "sqlite":
+        return sqlite_insert(entity).on_conflict_do_nothing()
+    raise NotImplementedError(f"insert_ignore does not support {dialect_name!r}")
 
 
 def create_engine(settings: Settings) -> AsyncEngine:
