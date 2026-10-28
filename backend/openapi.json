@@ -1532,5 +1532,24 @@
       "description": "Ingestion health and rejects (operator API key).",
       "name": "operator"
     }
+  ],
+  "x-websockets": [
+    {
+      "close_codes": {
+        "1001": "The server is shutting down; reconnect with backoff.",
+        "1012": "The server restarted without the campus-parking CLI (plain uvicorn); reconnect with backoff.",
+        "1013": "Too many connections; try again later."
+      },
+      "description": "Anonymous and read-only. The server sends the current snapshot on connect, then a new one whenever a lot's version changes, and one every heartbeat_s seconds regardless. Client messages are ignored.",
+      "heartbeat_s": 15.0,
+      "message": {
+        "$ref": "#/components/schemas/AvailabilitySnapshot"
+      },
+      "path": "/api/v1/live/availability",
+      "summary": "Live availability of every lot",
+      "tags": [
+        "availability"
+      ]
+    }
   ]
 }

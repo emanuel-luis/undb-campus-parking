@@ -20,6 +20,9 @@ from campus_parking.core.problems import register_problem_handlers
 from campus_parking.core.settings import Settings, get_settings
 from campus_parking.ingestion.router import router as ingestion_router
 from campus_parking.occupancy.router import router as occupancy_router
+from campus_parking.realtime.hub import Hub
+from campus_parking.realtime.poller import DbSource, Poller
+from campus_parking.realtime.router import router as realtime_router
 from campus_parking.registry.router import router as registry_router
 
 TITLE = "UNDB Campus Parking API"
@@ -47,10 +50,22 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.engine = create_engine(settings)
         app.state.sessionmaker = create_sessionmaker(app.state.engine)
+        app.state.hub = Hub(settings.live_max_connections)
+        app.state.live_source = DbSource(app.state.sessionmaker, settings.tzinfo)
+        poller = Poller(
+            app.state.live_source,
+            app.state.hub,
+            settings.live_poll_interval_s,
+            settings.live_heartbeat_s,
+        )
+        poll_task = asyncio.create_task(poller.run())
         try:
             yield
         finally:
             app.state.draining = True
+            await app.state.hub.close()  # sockets leave with 1001
+            poll_task.cancel()
+            await asyncio.gather(poll_task, return_exceptions=True)
             await app.state.engine.dispose()
 
     app = FastAPI(title=TITLE, version=package_version(), openapi_tags=TAGS, lifespan=lifespan)
@@ -79,6 +94,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     api_v1.include_router(registry_router)
     api_v1.include_router(ingestion_router)
     api_v1.include_router(occupancy_router)
+    api_v1.include_router(realtime_router)
     app.include_router(api_v1)
     install_openapi(app)
     return app
