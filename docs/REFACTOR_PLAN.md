@@ -61,7 +61,7 @@ Inside each backend module: `router` (HTTP only) â†’ `service` (domain logic) â†
 where logic is testable without a database. Dependencies are injected with `Depends`; domain
 errors are mapped to problem details once, in `core/problems.py`.
 
-The old `undb_faceid/` and `api/` folders are deleted in PR 3, when backend and generator cover
+The old `undb_faceid/` and `api/` folders are deleted in PR 4, when backend and generator cover
 them.
 
 ## Data model
