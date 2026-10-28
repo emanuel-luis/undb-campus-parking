@@ -36,3 +36,4 @@ this repository.
 | 29 | 2026-10-28 | Client stack versions | Expo SDK 57 (React Native 0.86.3, React 19.2.3 pinned in both apps with npm `overrides`), TypeScript 5.9, Node 24 LTS | SDK 58's Expo Go is not in the stores yet; openapi-typescript 7 needs TypeScript 5; one React copy in the workspace |
 | 30 | 2026-10-28 | JS workspace | npm workspaces (`apps/web`, `apps/mobile`, `packages/api-client`) | Expo needs no hoisting tweaks with npm; matches the other portfolio repos |
 | 31 | 2026-10-28 | Charts | ECharts on web; hand-drawn `react-native-svg` charts on mobile | Matches vaccine-warehouse; react-native-svg ships with Expo Go |
+| 32 | 2026-10-28 | Gate immutability | A gate's `lot_id` and `direction` cannot change from creation (409 `gate-immutable`); only the name can | Simpler than checking for events, and safe because append-only events reference both. Refines decision 19, which tied the rule to the gate having events |

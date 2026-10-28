@@ -2,8 +2,8 @@ SHELL := bash
 .SHELLFLAGS := -eu -o pipefail -c
 .DEFAULT_GOAL := help
 
-.PHONY: help install lint format test test-fast openapi openapi-check d2-install diagrams \
-	diagrams-check diagrams-watch
+.PHONY: help install lint format test test-fast migrate up-db down test-integration openapi \
+	openapi-check d2-install diagrams diagrams-check diagrams-watch
 
 help: ## list the targets
 	@grep -hE '^[a-zA-Z0-9_-]+:.*## ' $(MAKEFILE_LIST) | sort | \
@@ -72,6 +72,23 @@ test: ## pytest with the coverage gate (85%), no Postgres needed
 
 test-fast: ## pytest -x -q without coverage
 	cd backend && uv run pytest -x -q --no-cov
+
+migrate: ## apply the migrations to PARKING_DATABASE_URL (alembic upgrade head)
+	$(BACKEND) run campus-parking migrate
+
+# Local Postgres from compose.yaml (service `postgres`). Integration tests use their own database
+# (parking_test, created on demand), never the application database `parking`.
+TEST_DATABASE_URL ?= postgresql+asyncpg://parking:parking@localhost:5432/parking_test
+export TEST_DATABASE_URL
+
+up-db: ## start the local Postgres and wait until it is healthy
+	docker compose up -d --wait postgres
+
+down: ## stop the local stack and delete its volumes
+	docker compose down -v
+
+test-integration: ## pytest -m integration against TEST_DATABASE_URL (run make up-db first)
+	cd backend && uv run pytest -m integration --no-cov -q
 
 openapi: ## write backend/openapi.json from the app
 	$(BACKEND) run campus-parking openapi --output backend/openapi.json
