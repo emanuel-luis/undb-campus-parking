@@ -1,0 +1,81 @@
+[project]
+name = "campus-parking"
+version = "0.1.0"
+description = "UNDB campus parking: FastAPI backend for gate-event ingestion, occupancy and reports."
+requires-python = ">=3.12"
+authors = [{ name = "Emanuel Luis", email = "emanuel.filho08@gmail.com" }]
+dependencies = [
+    "alembic>=1.20.1",
+    "asyncpg>=0.32",
+    "fastapi>=0.162",
+    "prometheus-client>=0.26",
+    "pydantic>=2.14",
+    "pydantic-settings>=2.16.1",
+    "sqlalchemy[asyncio]>=2.1.6",
+    "tzdata",
+    "uvicorn[standard]>=0.54",
+]
+
+[project.scripts]
+campus-parking = "campus_parking.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.13.5,<0.14.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "campus_parking"
+
+[dependency-groups]
+dev = [
+    "aiosqlite",
+    "httpx>=0.28.1",
+    "hypothesis>=6.170",
+    "mypy>=2.4",
+    "pytest>=9.2",
+    "pytest-asyncio>=1.4.1",
+    "pytest-cov>=7.1",
+    "pytest-timeout>=2.4",
+    "ruff>=0.17.3",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+# A broad except needs `# noqa: BLE001 - reason`.
+extend-select = ["BLE", "I", "UP", "B", "SIM", "RUF", "DTZ"]
+
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = [
+    "fastapi.Depends",
+    "fastapi.Query",
+    "fastapi.Header",
+    "fastapi.Security",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["DTZ"]
+
+[tool.mypy]
+files = ["src"]
+python_version = "3.12"
+strict = true
+plugins = ["pydantic.mypy"]
+enable_error_code = ["ignore-without-code"]
+
+[tool.pydantic-mypy]
+init_typed = true
+init_forbid_extra = true
+
+[tool.pytest.ini_options]
+addopts = "-ra --strict-markers --strict-config -m 'not integration' --cov=campus_parking --cov-report=term-missing:skip-covered --cov-fail-under=85"
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+timeout = 60
+markers = ["integration: needs a real Postgres (TEST_DATABASE_URL); deselected by default"]
+
+[tool.coverage.run]
+branch = true
