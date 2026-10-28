@@ -7,7 +7,7 @@ from campus_parking.cli import alembic_config
 from tests.integration.conftest import fetch_column, run_sql
 
 TABLES_0001 = ["gates", "lot_capacity_history", "lots", "students"]
-TABLES = [
+TABLES_0002 = [
     "gate_events",
     "gates",
     "ingest_batches",
@@ -18,6 +18,7 @@ TABLES = [
     "stays",
     "students",
 ]
+TABLES = sorted([*TABLES_0002, "pipeline_runs", "service_days"])
 TABLES_SQL = (
     "SELECT table_name FROM information_schema.tables "
     "WHERE table_schema = 'public' ORDER BY table_name"
@@ -33,6 +34,11 @@ def test_upgrade_downgrade_upgrade(pg_database: str) -> None:
     cfg = alembic_config()
     command.upgrade(cfg, "head")
     assert asyncio.run(fetch_column(pg_database, TABLES_SQL)) == ["alembic_version", *TABLES]
+    command.downgrade(cfg, "0002")
+    assert asyncio.run(fetch_column(pg_database, TABLES_SQL)) == [
+        "alembic_version",
+        *TABLES_0002,
+    ]
     command.downgrade(cfg, "0001")
     assert asyncio.run(fetch_column(pg_database, TABLES_SQL)) == ["alembic_version", *TABLES_0001]
     assert asyncio.run(fetch_column(pg_database, TRIGGER_SQL)) == []
@@ -106,6 +112,13 @@ def test_constraint_names_follow_the_convention(pg_database: str) -> None:
         "ck_lot_occupancy_occupied_non_negative",
         "uq_stays_entry_event_id",
         "uq_stays_exit_event_id",
+        "pk_pipeline_runs",
+        "pk_service_days",
+        "fk_pipeline_runs_parent_run_id_pipeline_runs",
+        "fk_service_days_run_id_pipeline_runs",
+        "ck_pipeline_runs_job_valid",
+        "ck_pipeline_runs_trigger_valid",
+        "ck_pipeline_runs_status_valid",
     } <= set(names)
 
 
@@ -127,6 +140,14 @@ def test_index_names_and_the_partial_index(pg_database: str) -> None:
         "ix_stays_lot_id_student_ref_service_date",
         "ix_stays_updated_at",
         "ix_stays_lot_id_open",
+        "uq_pipeline_runs_job_service_date_active",
+        "ix_pipeline_runs_requested_at_queued",
     } <= names
     partial = next(d for d in defs if d.startswith("ix_stays_lot_id_open"))
     assert "WHERE (status = 'open'::text)" in partial
+    active = next(d for d in defs if d.startswith("uq_pipeline_runs_job_service_date_active"))
+    assert "UNIQUE INDEX" in active
+    assert "'queued'::text" in active
+    assert "'running'::text" in active
+    queued = next(d for d in defs if d.startswith("ix_pipeline_runs_requested_at_queued"))
+    assert "WHERE (status = 'queued'::text)" in queued

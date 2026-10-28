@@ -1,7 +1,7 @@
 """Occupancy persistence (SQLAlchemy 2 async). The caller owns the transaction."""
 
 from collections import Counter, defaultdict
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from datetime import date, datetime
 from typing import Any
 
@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from campus_parking.core.db import insert_ignore, never_backwards
 from campus_parking.ingestion.models import GateEventRow
+from campus_parking.jobs.models import ServiceDay
 from campus_parking.occupancy.models import LotOccupancy, Stay
 from campus_parking.occupancy.pairing import StayEvent
 from campus_parking.registry.models import Lot
@@ -39,6 +40,11 @@ class OccupancyRepository:
             .order_by(LotOccupancy.lot_id)
             .with_for_update()
         )
+
+    async def closed_days(self, days: Collection[date]) -> set[date]:
+        """Which of `days` close_day has already closed."""
+        stmt = select(ServiceDay.service_date).where(ServiceDay.service_date.in_(days))
+        return set(await self.session.scalars(stmt))
 
     async def open_by_lot(self, keys: Sequence[StayKey]) -> Counter[str]:
         stmt = (

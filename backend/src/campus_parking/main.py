@@ -19,6 +19,7 @@ from campus_parking.core.openapi import install_openapi
 from campus_parking.core.problems import register_problem_handlers
 from campus_parking.core.settings import Settings, get_settings
 from campus_parking.ingestion.router import router as ingestion_router
+from campus_parking.jobs.router import router as jobs_router
 from campus_parking.occupancy.router import router as occupancy_router
 from campus_parking.realtime.hub import Hub
 from campus_parking.realtime.poller import DbSource, Poller
@@ -32,7 +33,10 @@ TAGS = [
     {"name": "admin", "description": "Registry writes (admin API key)."},
     {"name": "availability", "description": "Free spaces per lot, derived from gate events."},
     {"name": "ingestion", "description": "Gate-event intake (ingest API key)."},
-    {"name": "operator", "description": "Ingestion health and rejects (operator API key)."},
+    {
+        "name": "operator",
+        "description": "Ingestion health, rejects and pipeline runs (operator API key).",
+    },
 ]
 
 
@@ -93,6 +97,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     api_v1 = APIRouter(prefix="/api/v1")
     api_v1.include_router(registry_router)
     api_v1.include_router(ingestion_router)
+    api_v1.include_router(jobs_router)
     api_v1.include_router(occupancy_router)
     api_v1.include_router(realtime_router)
     app.include_router(api_v1)
