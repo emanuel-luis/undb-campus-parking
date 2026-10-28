@@ -1,0 +1,35 @@
+name: campus_parking_warehouse
+version: "0.1.0"
+config-version: 2
+profile: campus_parking_warehouse
+
+flags:
+  send_anonymous_usage_stats: false
+
+vars:
+  # Service time zone: local dates, hours and 15-minute slots. The worker passes
+  # PARKING_TIMEZONE here with --vars.
+  timezone: America/Fortaleza
+  dim_date_start: "2024-01-01"
+  dim_date_end: "2030-12-31"
+  # Incremental models re-read this much before their watermark (late commits).
+  lookback_minutes: 10
+
+# Alembic owns schema public; dbt owns warehouse_staging (views) and warehouse (everything else).
+models:
+  campus_parking_warehouse:
+    staging:
+      +schema: warehouse_staging
+      +materialized: view
+    intermediate:
+      +schema: warehouse_staging
+      +materialized: view
+    marts:
+      +materialized: table
+
+seeds:
+  campus_parking_warehouse:
+    holidays:
+      +column_types:
+        holiday_date: date
+        holiday_name: text

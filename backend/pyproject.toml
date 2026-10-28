@@ -28,6 +28,10 @@ build-backend = "uv_build"
 module-name = "campus_parking"
 
 [dependency-groups]
+dbt = [
+    "dbt-core==1.12.6",
+    "dbt-postgres==1.11.0",
+]
 dev = [
     "aiosqlite",
     "httpx>=0.28.1",

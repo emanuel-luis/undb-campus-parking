@@ -1,0 +1,193 @@
+version: 2
+
+# The reports API reads these four tables only; their column names and types are a contract.
+models:
+  - name: mart_lot_daily
+    description: >
+      Grain: lot x local day, every day from the first stay to today. Traffic from
+      fct_gate_event, dwell from closed stays in fct_stay (avg, median and p90 per lot and day:
+      never add them across lots), occupancy from fct_occupancy_snapshot.
+    config:
+      contract: {enforced: true}
+    data_tests:
+      - unique_combination:
+          arguments:
+            columns: [lot_id, service_date]
+    columns:
+      - name: lot_id
+        data_type: text
+        data_tests: [not_null]
+      - name: service_date
+        data_type: date
+        data_tests: [not_null]
+      - name: date_key
+        data_type: integer
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_date')
+                field: date_key
+      - name: capacity
+        description: Capacity in force on the day.
+        data_type: integer
+      - name: entries
+        data_type: integer
+      - name: exits
+        data_type: integer
+      - name: unique_students
+        description: Distinct students with at least one event at the lot that day.
+        data_type: integer
+      - name: entries_ma7
+        description: Mean of entries over the day and the 6 days before it.
+        data_type: numeric(10, 2)
+      - name: avg_stay_min
+        description: Mean duration of closed stays, minutes; NULL without closed stays.
+        data_type: numeric(10, 2)
+      - name: median_stay_min
+        data_type: numeric(10, 2)
+      - name: p90_stay_min
+        data_type: numeric(10, 2)
+      - name: peak_occupied
+        description: Highest occupancy in any slot of the day.
+        data_type: integer
+      - name: peak_slot
+        description: HH:MM start of the first slot that reached peak_occupied.
+        data_type: text
+      - name: min_free
+        description: Fewest free spaces in any slot of the day (never below 0).
+        data_type: integer
+      - name: minutes_full
+        description: Minutes with occupancy at or above capacity.
+        data_type: numeric(10, 2)
+      - name: stays
+        description: Stays with an entry that day.
+        data_type: integer
+      - name: turnover
+        description: stays / capacity.
+        data_type: numeric(10, 2)
+      - name: closed_by_reconciliation
+        data_type: integer
+      - name: exit_only
+        data_type: integer
+      - name: missing_exit
+        data_type: integer
+
+  - name: mart_lot_hourly
+    description: >
+      Grain: lot x local day x hour, for hours that have started. Entries and exits by the local
+      hour of occurred_at; avg_free and avg_occupied average the slots of the hour.
+    config:
+      contract: {enforced: true}
+    data_tests:
+      - unique_combination:
+          arguments:
+            columns: [lot_id, service_date, hour]
+    columns:
+      - name: lot_id
+        data_type: text
+        data_tests: [not_null]
+      - name: service_date
+        data_type: date
+        data_tests: [not_null]
+      - name: date_key
+        data_type: integer
+      - name: hour
+        data_type: integer
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23]
+      - name: capacity
+        data_type: integer
+      - name: entries
+        data_type: integer
+      - name: exits
+        data_type: integer
+      - name: avg_free
+        data_type: numeric(10, 2)
+      - name: avg_occupied
+        data_type: numeric(10, 2)
+      - name: max_occupied
+        data_type: integer
+
+  - name: mart_lot_dwell_daily
+    description: >
+      Grain: lot x local day x duration bucket (all six buckets, 0 when empty). Closed stays
+      only.
+    config:
+      contract: {enforced: true}
+    data_tests:
+      - unique_combination:
+          arguments:
+            columns: [lot_id, service_date, duration_bucket]
+    columns:
+      - name: lot_id
+        data_type: text
+        data_tests: [not_null]
+      - name: service_date
+        data_type: date
+        data_tests: [not_null]
+      - name: date_key
+        data_type: integer
+      - name: duration_bucket
+        data_type: text
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['<30m', '30-60m', '1-2h', '2-4h', '4-6h', '>6h']
+      - name: bucket_order
+        description: 1 (<30m) to 6 (>6h).
+        data_type: integer
+      - name: stays
+        data_type: integer
+
+  - name: mart_data_quality_daily
+    description: >
+      Grain: local day x lot, with lot_id '-1' for rejects whose lot is missing or unknown.
+      Rejects by reason (day = the event's service date, else the local received date) and the
+      stays closed by reconciliation, exit-only and missing an exit.
+    config:
+      contract: {enforced: true}
+    data_tests:
+      - unique_combination:
+          arguments:
+            columns: [service_date, lot_id]
+    columns:
+      - name: service_date
+        data_type: date
+        data_tests: [not_null]
+      - name: date_key
+        data_type: integer
+      - name: lot_id
+        data_type: text
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_lot')
+                field: lot_id
+      - name: rejects_total
+        data_type: integer
+      - name: rejects_schema_invalid
+        data_type: integer
+      - name: rejects_unknown_gate
+        data_type: integer
+      - name: rejects_unknown_student
+        data_type: integer
+      - name: rejects_lot_mismatch
+        data_type: integer
+      - name: rejects_direction_mismatch
+        data_type: integer
+      - name: rejects_in_future
+        data_type: integer
+      - name: rejects_too_old
+        data_type: integer
+      - name: rejects_event_id_conflict
+        data_type: integer
+      - name: closed_by_reconciliation
+        data_type: integer
+      - name: exit_only
+        data_type: integer
+      - name: missing_exit
+        data_type: integer
