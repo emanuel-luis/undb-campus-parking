@@ -72,6 +72,7 @@ export function createLiveAvailability(options: LiveOptions): LiveAvailability {
   let silenceTimer: unknown
   let pollTimer: unknown
   let polling = false
+  let pollGen = 0
   const lots = new Map<string, LotAvailability>()
 
   function setStatus(next: LiveStatus): void {
@@ -117,11 +118,14 @@ export function createLiveAvailability(options: LiveOptions): LiveAvailability {
     silenceTimer = setT(() => down(socket), SILENCE_MS)
   }
 
-  async function pollOnce(): Promise<void> {
+  // A fetch in flight cannot be cancelled, so each poll chain carries a generation; stopPolling()
+  // bumps it and an older chain neither merges its result nor schedules another tick.
+  async function pollOnce(gen: number): Promise<void> {
     try {
       const response = await doFetch(`${base}/api/v1/availability`)
-      if (!response.ok || !polling) return
-      merge((await response.json()) as AvailabilitySnapshot)
+      if (!response.ok || gen !== pollGen) return
+      const body = (await response.json()) as AvailabilitySnapshot
+      if (gen === pollGen) merge(body)
     } catch {
       // keep polling; the next tick retries
     }
@@ -130,15 +134,17 @@ export function createLiveAvailability(options: LiveOptions): LiveAvailability {
   function startPolling(): void {
     if (polling) return
     polling = true
+    const gen = ++pollGen
     const tick = async (): Promise<void> => {
-      await pollOnce()
-      if (polling) pollTimer = setT(() => void tick(), POLL_MS)
+      await pollOnce(gen)
+      if (polling && gen === pollGen) pollTimer = setT(() => void tick(), POLL_MS)
     }
     void tick()
   }
 
   function stopPolling(): void {
     polling = false
+    pollGen += 1
     clearT(pollTimer)
   }
 
@@ -164,6 +170,7 @@ export function createLiveAvailability(options: LiveOptions): LiveAvailability {
       return
     }
     socket = s
+    armSilence() // a handshake that never completes is as silent as a dead socket
     s.onopen = () => {
       if (s !== socket) return
       stopPolling()

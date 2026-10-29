@@ -1,6 +1,6 @@
 import { queryOptions } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
-import type { OccupancyParams, ParkingClient, RejectsParams, ReportRange, RunsParams } from './client'
+import type { IngestionHealthParams, OccupancyParams, ParkingClient, RejectsParams, ReportRange, RunsParams } from './client'
 import { createLiveAvailability, type AvailabilitySnapshot, type LiveStatus } from './live'
 
 /** Sort keys and drop undefined so equal filters always give equal query keys. */
@@ -43,7 +43,7 @@ export const parkingQueries = {
     queryOptions({ queryKey: parkingKeys.report('occupancy', p), queryFn: () => c.reports.occupancy(p) }),
   freshness: (c: ParkingClient) =>
     queryOptions({ queryKey: parkingKeys.report('freshness'), queryFn: () => c.reports.freshness() }),
-  ingestionHealth: (c: ParkingClient, p: { window_min?: number } = {}) =>
+  ingestionHealth: (c: ParkingClient, p: IngestionHealthParams = {}) =>
     queryOptions({
       queryKey: parkingKeys.operator('ingestion-health', p),
       queryFn: () => c.operator.ingestionHealth(p),
@@ -52,7 +52,7 @@ export const parkingQueries = {
     queryOptions({ queryKey: parkingKeys.operator('rejects', p), queryFn: () => c.operator.rejects(p) }),
   runs: (c: ParkingClient, p: RunsParams = {}) =>
     queryOptions({ queryKey: parkingKeys.operator('runs', p), queryFn: () => c.operator.runs(p) }),
-  run: (c: ParkingClient, runId: number) =>
+  run: (c: ParkingClient, runId: string) =>
     queryOptions({ queryKey: parkingKeys.operator('run', { runId }), queryFn: () => c.operator.run(runId) }),
 }
 
@@ -61,7 +61,11 @@ export interface UseLiveAvailabilityOptions {
   enabled?: boolean
 }
 
-/** Live availability for react-dom and react-native. The page-hidden case on the web is handled here. */
+/**
+ * Live availability for react-dom and react-native. On the web the hook pauses while the page is
+ * hidden (and does not connect when mounted hidden). `client` must be stable (created once,
+ * outside render or memoized): the effect reconnects whenever it changes.
+ */
 export function useLiveAvailability(client: ParkingClient, options: UseLiveAvailabilityOptions = {}) {
   const enabled = options.enabled ?? true
   const [snapshot, setSnapshot] = useState<AvailabilitySnapshot | null>(null)
@@ -80,9 +84,17 @@ export function useLiveAvailability(client: ParkingClient, options: UseLiveAvail
       onStatus: setStatus,
     })
     const hasDocument = typeof document !== 'undefined'
-    const onVisibility = () => (document.visibilityState === 'hidden' ? live.pause() : live.resume())
+    const hidden = () => hasDocument && document.visibilityState === 'hidden'
+    // start() works from closed only and resume() from paused only, so calling both is safe.
+    const onVisibility = () => {
+      if (hidden()) live.pause()
+      else {
+        live.start()
+        live.resume()
+      }
+    }
     if (hasDocument) document.addEventListener('visibilitychange', onVisibility)
-    live.start()
+    if (!hidden()) live.start()
     return () => {
       if (hasDocument) document.removeEventListener('visibilitychange', onVisibility)
       live.close()
