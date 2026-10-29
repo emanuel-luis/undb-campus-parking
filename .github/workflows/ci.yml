@@ -88,6 +88,31 @@ jobs:
       - name: Integration tests against Postgres
         run: make test-integration
 
+  js:
+    name: js (api-client: lint, typecheck, test, client drift)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Install from package-lock.json
+        run: npm ci
+      - name: ESLint (no warnings allowed)
+        run: npm run lint
+      - name: TypeScript
+        run: npm run typecheck
+      - name: Vitest with the 85% coverage gate
+        run: npm test
+      - name: Client drift check (schema.ts against backend/openapi.json)
+        run: |
+          npm run gen:api -w @undb-campus-parking/api-client
+          git diff --exit-code -- packages/api-client/src/schema.ts
+
   generator-lint:
     name: generator lint (ruff, mypy, models drift)
     runs-on: ubuntu-latest
