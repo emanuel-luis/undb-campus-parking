@@ -49,4 +49,4 @@ The server also sends protocol pings every 20 seconds (uvicorn default).
 5. Close the socket when the page is hidden or the app is in the background; open it again, and
    take a fresh snapshot, when it returns.
 
-The shared client in `packages/api-client` (`live.ts`, added in a later PR) will implement these rules for web and mobile.
+The shared client implements these rules in `packages/api-client/src/live.ts` (`createLiveAvailability`, used by the `useLiveAvailability` hook in the `react` entry), for web and mobile. Its tests drive each rule with a fake socket and fake timers. Rule 5 is the caller's job: call `pause()` when the page is hidden or the app is in the background, and `resume()` when it returns (the hook does this on the web).
