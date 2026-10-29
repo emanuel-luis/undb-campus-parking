@@ -19,6 +19,7 @@ from campus_parking.jobs import queue, scheduler
 from campus_parking.jobs.close_day import close_day, export_into, pending_days, require_past
 from campus_parking.jobs.models import PipelineRun
 from campus_parking.jobs.runs import RunResult, track
+from campus_parking.jobs.warehouse import WarehouseMode, run_warehouse
 
 logger = logging.getLogger(__name__)
 
@@ -61,8 +62,11 @@ class Worker:
                 await self._close_day(run, result)
             elif run.job == "daily":
                 await self._daily(run, result)
+            elif run.job == "warehouse":
+                mode: WarehouseMode = "full" if run.mode == "full" else "incremental"
+                await run_warehouse(self.settings, mode, result)
             else:
-                raise RuntimeError(f"job {run.job!r} is not available yet")
+                raise RuntimeError(f"unknown job {run.job!r}")
         return result
 
     async def _close_day(self, run: PipelineRun, result: RunResult) -> None:
@@ -77,8 +81,32 @@ class Worker:
                 self.sessionmaker, self.settings, run.service_date, run.run_id, now, result
             )
 
+    async def _child(
+        self, run: PipelineRun, job: str, day: date, mode: str | None = None
+    ) -> tuple[RunResult | None, bool]:
+        """Run a child of `run` now. (result, ran): result None when it failed; ran False when
+        the same job and date was already queued or running."""
+        async with self.sessionmaker() as session:
+            child, created = await queue.add_run(
+                session,
+                job=job,
+                service_date=day,
+                trigger=run.trigger,
+                now=self.clock(),
+                status="running",
+                mode=mode,
+                parent_run_id=run.run_id,
+            )
+        if not created:
+            return None, False
+        try:
+            return await self.execute(child), True
+        except Exception:  # noqa: BLE001 - the child row holds the error; the caller goes on
+            return None, True
+
     async def _daily(self, run: PipelineRun, result: RunResult) -> None:
-        """close_day, as a child run, for every pending date in date order."""
+        """close_day, as a child run, for every pending date in date order, then
+        warehouse/full as the last child."""
         async with self.sessionmaker() as session:
             days = await pending_days(session, self.settings, self.clock())
         days = sorted({*days, run.service_date})
@@ -87,31 +115,26 @@ class Worker:
         failed: list[str] = []
         rows_read = rows_written = 0
         for day in days:
-            async with self.sessionmaker() as session:
-                child, created = await queue.add_run(
-                    session,
-                    job="close_day",
-                    service_date=day,
-                    trigger=run.trigger,
-                    now=self.clock(),
-                    status="running",
-                    parent_run_id=run.run_id,
-                )
-            if not created:  # another close_day for this date is queued or running
+            child_result, ran = await self._child(run, "close_day", day)
+            if not ran:  # another close_day for this date is queued or running
                 skipped.append(day.isoformat())
-                continue
-            try:
-                child_result = await self.execute(child)
-            except Exception:  # noqa: BLE001 - the child row holds the error; go on with the rest
+            elif child_result is None:
                 failed.append(day.isoformat())
-                continue
-            done.append(day.isoformat())
-            rows_read += child_result.rows_read or 0
-            rows_written += child_result.rows_written or 0
+            else:
+                done.append(day.isoformat())
+                rows_read += child_result.rows_read or 0
+                rows_written += child_result.rows_written or 0
         result.rows_read, result.rows_written = rows_read, rows_written
         result.metrics.update(closed=done, skipped=skipped, failed=failed)
+        # The warehouse refresh runs even after a failed day: the other days are worth it.
+        warehouse, ran = await self._child(run, "warehouse", run.service_date, "full")
+        result.metrics["warehouse"] = (
+            "skipped" if not ran else "failed" if warehouse is None else "succeeded"
+        )
         if failed:
             raise RuntimeError(f"{len(failed)} of {len(days)} days failed: {', '.join(failed)}")
+        if result.metrics["warehouse"] == "failed":
+            raise RuntimeError("the warehouse refresh failed")
 
     async def run_direct(
         self, job: str, day: date, trigger: str = "cli", mode: str | None = None
@@ -204,18 +227,34 @@ async def run_worker(settings: Settings) -> int:
     return 0
 
 
-async def run_once(settings: Settings, job: str, day: date | None, trigger: str = "cli") -> int:
-    """`worker --once`, `close-day` and `export`: one run in this process; exit code for the CLI.
-    0 succeeded, 1 failed or already active, 2 the date is not over yet."""
+async def run_once(
+    settings: Settings,
+    job: str,
+    day: date | None,
+    trigger: str = "cli",
+    mode: str | None = None,
+) -> int:
+    """`worker --once`, `close-day`, `export` and `warehouse`: one run in this process; exit
+    code for the CLI. 0 succeeded, 1 failed or already active, 2 the date is not allowed (not
+    over yet; for warehouse, in the future)."""
     engine = create_engine(settings)
     worker = Worker(settings, create_sessionmaker(engine))
     try:
-        target = day or service_date(worker.clock(), settings.tzinfo) - timedelta(days=1)
-        mode = "export" if job == "export" else None
+        today = service_date(worker.clock(), settings.tzinfo)
+        if job == "warehouse":  # the date only labels the run: today or a past date
+            if day is not None and day > today:
+                logger.error(
+                    f"{day} is in the future in {settings.timezone}; warehouse runs "
+                    "take today or a past date."
+                )
+                return 2
+            target = day or today
+        else:
+            target = day or today - timedelta(days=1)
+        if job == "export":
+            job, mode = "close_day", "export"
         try:
-            run = await worker.run_direct(
-                "close_day" if job == "export" else job, target, trigger, mode
-            )
+            run = await worker.run_direct(job, target, trigger, mode)
         except DayNotClosed as exc:
             logger.error(exc.detail)
             return 2

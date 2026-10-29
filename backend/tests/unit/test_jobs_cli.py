@@ -54,6 +54,32 @@ def test_close_day_runs_and_records_a_cli_run(db: Path, tmp_path: Path) -> None:
     assert (tmp_path / "lake" / "raw" / "gate_events" / "service_date=2020-01-01").is_dir()
 
 
+def test_warehouse_command_and_worker_once_warehouse(db: Path, fake_dbt: list[str]) -> None:
+    assert cli.main(["warehouse", "--full", "--date", PAST.isoformat()]) == 0
+    assert cli.main(["worker", "--once", "warehouse"]) == 0
+    assert fake_dbt == ["full", "incremental"]
+    assert [(r.job, r.mode, r.status) for r in runs(db)] == [
+        ("warehouse", "full", "succeeded"),
+        ("warehouse", "incremental", "succeeded"),
+    ]
+    assert runs(db)[1].service_date in {
+        datetime.now(UTC).date(),
+        datetime.now(UTC).date() - timedelta(days=1),
+    }  # today in the service time zone
+
+
+def test_warehouse_refuses_a_future_date(
+    db: Path, fake_dbt: list[str], capfd: pytest.CaptureFixture[str]
+) -> None:
+    future = (datetime.now(UTC) + timedelta(days=2)).date().isoformat()
+    assert cli.main(["warehouse", "--date", future]) == 2
+    assert cli.main(["worker", "--once", "warehouse", "--date", future]) == 2
+    out = capfd.readouterr()
+    assert "in the future" in out.out + out.err
+    assert fake_dbt == []
+    assert runs(db) == []
+
+
 def test_export_is_a_close_day_run_in_export_mode(db: Path) -> None:
     assert cli.main(["export", "--date", PAST.isoformat()]) == 0
     (run,) = runs(db)

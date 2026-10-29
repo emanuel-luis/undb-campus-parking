@@ -1,0 +1,71 @@
+version: 2
+
+models:
+  - name: dim_date
+    description: >
+      Grain: one calendar day from var dim_date_start (2024-01-01) to dim_date_end (2030-12-31).
+      Weekday names in Portuguese; is_holiday from the holidays seed. No unknown member.
+    columns:
+      - name: date_key
+        description: Date as integer YYYYMMDD. Primary key.
+        data_tests: [unique, not_null]
+      - name: date_day
+        data_tests: [unique, not_null]
+      - name: iso_day_of_week
+        description: 1 (Monday) to 7 (Sunday).
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [1, 2, 3, 4, 5, 6, 7]
+      - name: weekday_name
+        description: Portuguese weekday name (segunda-feira ... domingo).
+
+  - name: dim_time
+    description: >
+      Grain: one local 15-minute slot of a day, 96 rows. slot_key 0 is 00:00-00:15, 95 is
+      23:45-24:00.
+    columns:
+      - name: slot_key
+        description: 0 to 95. Primary key.
+        data_tests: [unique, not_null]
+      - name: slot_label
+        description: Slot start as HH:MM.
+
+  - name: dim_lot
+    description: >
+      Grain: one capacity version of a lot (SCD2 in business time, built from
+      lot_capacity_history): the version holds from valid_from (inclusive) to valid_to
+      (exclusive, 9999-12-31 for the last one). is_current marks the version in force today.
+      Includes the unknown member, lot_key = lot_id = '-1'.
+    columns:
+      - name: lot_key
+        description: md5 of (lot_id, valid_from); '-1' for the unknown member. Primary key.
+        data_tests: [unique, not_null]
+      - name: lot_id
+        data_tests: [not_null]
+      - name: capacity
+        description: Spaces in this version; NULL for the unknown member.
+
+  - name: dim_gate
+    description: "Grain: one gate (gate_id). Lot and direction never change."
+    columns:
+      - name: gate_key
+        description: md5 of gate_id. Primary key.
+        data_tests: [unique, not_null]
+      - name: gate_id
+        data_tests: [unique, not_null]
+      - name: direction
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [entry, exit]
+
+  - name: dim_student
+    description: >
+      Grain: one pseudonymous student. The key is md5(student_ref); the ref itself is never
+      stored in the warehouse schema. first_seen_at and last_seen_at come from the gate events
+      (NULL for a student without events).
+    columns:
+      - name: student_key
+        description: md5 of the student ref. Primary key.
+        data_tests: [unique, not_null]

@@ -1,0 +1,15 @@
+# Read by dbt from this folder (the worker runs dbt with --profiles-dir set to the project). The
+# worker derives the DBT_PG_* variables from PARKING_DATABASE_URL; set them yourself to run dbt
+# by hand.
+campus_parking_warehouse:
+  target: default
+  outputs:
+    default:
+      type: postgres
+      host: "{{ env_var('DBT_PG_HOST', 'localhost') }}"
+      port: "{{ env_var('DBT_PG_PORT', '5432') | as_number }}"
+      user: "{{ env_var('DBT_PG_USER', 'parking') }}"
+      password: "{{ env_var('DBT_PG_PASSWORD', '') }}"
+      dbname: "{{ env_var('DBT_PG_DBNAME', 'parking') }}"
+      schema: warehouse
+      threads: 4

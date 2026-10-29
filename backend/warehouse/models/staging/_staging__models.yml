@@ -1,0 +1,54 @@
+version: 2
+
+models:
+  - name: stg_parking__gate_events
+    description: >
+      Grain: one accepted gate event (event_id). The student ref is replaced by its md5
+      (student_key).
+    columns:
+      - name: event_id
+        data_tests: [unique, not_null]
+      - name: direction
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [entry, exit]
+
+  - name: stg_parking__stays
+    description: "Grain: one stay (stay_id). The student ref is replaced by its md5 (student_key)."
+    columns:
+      - name: stay_id
+        data_tests: [unique, not_null]
+      - name: status
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [open, closed, missing_exit, exit_only, closed_by_reconciliation]
+
+  - name: stg_parking__lots
+    description: "Grain: one lot (lot_id)."
+    columns:
+      - name: lot_id
+        data_tests: [unique, not_null]
+
+  - name: stg_parking__lot_capacity_history
+    description: "Grain: one capacity version (lot_id, valid_from)."
+
+  - name: stg_parking__gates
+    description: "Grain: one gate (gate_id)."
+    columns:
+      - name: gate_id
+        data_tests: [unique, not_null]
+
+  - name: stg_parking__students
+    description: "Grain: one student (student_key = md5 of the student ref)."
+    columns:
+      - name: student_key
+        data_tests: [unique, not_null]
+
+  - name: stg_parking__ingest_rejects
+    description: >
+      Grain: one rejected item (reject_id). received_date is the local date it was received.
+    columns:
+      - name: reject_id
+        data_tests: [unique, not_null]

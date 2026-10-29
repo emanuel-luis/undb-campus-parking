@@ -63,6 +63,43 @@
         "title": "CapacityPeriod",
         "type": "object"
       },
+      "DwellBucketRow": {
+        "description": "Closed stays per duration bucket over the range.",
+        "properties": {
+          "bucket_order": {
+            "title": "Bucket Order",
+            "type": "integer"
+          },
+          "duration_bucket": {
+            "enum": [
+              "<30m",
+              "30-60m",
+              "1-2h",
+              "2-4h",
+              "4-6h",
+              ">6h"
+            ],
+            "title": "Duration Bucket",
+            "type": "string"
+          },
+          "lot_id": {
+            "title": "Lot Id",
+            "type": "string"
+          },
+          "stays": {
+            "title": "Stays",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "lot_id",
+          "duration_bucket",
+          "bucket_order",
+          "stays"
+        ],
+        "title": "DwellBucketRow",
+        "type": "object"
+      },
       "GateEvent": {
         "additionalProperties": false,
         "properties": {
@@ -457,6 +494,267 @@
         "title": "LotAvailability",
         "type": "object"
       },
+      "LotDailyRow": {
+        "properties": {
+          "avg_stay_min": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Stay Min"
+          },
+          "capacity": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capacity"
+          },
+          "closed_by_reconciliation": {
+            "title": "Closed By Reconciliation",
+            "type": "integer"
+          },
+          "entries": {
+            "title": "Entries",
+            "type": "integer"
+          },
+          "entries_ma7": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Mean entries of the day and the 6 before.",
+            "title": "Entries Ma7"
+          },
+          "exit_only": {
+            "title": "Exit Only",
+            "type": "integer"
+          },
+          "exits": {
+            "title": "Exits",
+            "type": "integer"
+          },
+          "lot_id": {
+            "title": "Lot Id",
+            "type": "string"
+          },
+          "median_stay_min": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Median Stay Min"
+          },
+          "min_free": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Free"
+          },
+          "minutes_full": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minutes Full"
+          },
+          "missing_exit": {
+            "title": "Missing Exit",
+            "type": "integer"
+          },
+          "p90_stay_min": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P90 Stay Min"
+          },
+          "peak_occupied": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Peak Occupied"
+          },
+          "peak_slot": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "HH:MM start of the first slot at the peak.",
+            "title": "Peak Slot"
+          },
+          "service_date": {
+            "format": "date",
+            "title": "Service Date",
+            "type": "string"
+          },
+          "stays": {
+            "title": "Stays",
+            "type": "integer"
+          },
+          "turnover": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Stays with an entry per space.",
+            "title": "Turnover"
+          },
+          "unique_students": {
+            "title": "Unique Students",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "lot_id",
+          "service_date",
+          "capacity",
+          "entries",
+          "exits",
+          "unique_students",
+          "entries_ma7",
+          "avg_stay_min",
+          "median_stay_min",
+          "p90_stay_min",
+          "peak_occupied",
+          "peak_slot",
+          "min_free",
+          "minutes_full",
+          "stays",
+          "turnover",
+          "closed_by_reconciliation",
+          "exit_only",
+          "missing_exit"
+        ],
+        "title": "LotDailyRow",
+        "type": "object"
+      },
+      "LotHourlyRow": {
+        "properties": {
+          "avg_free": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Free"
+          },
+          "avg_occupied": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Occupied"
+          },
+          "capacity": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capacity"
+          },
+          "entries": {
+            "title": "Entries",
+            "type": "integer"
+          },
+          "exits": {
+            "title": "Exits",
+            "type": "integer"
+          },
+          "hour": {
+            "maximum": 23.0,
+            "minimum": 0.0,
+            "title": "Hour",
+            "type": "integer"
+          },
+          "lot_id": {
+            "title": "Lot Id",
+            "type": "string"
+          },
+          "max_occupied": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Occupied"
+          },
+          "service_date": {
+            "format": "date",
+            "title": "Service Date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "lot_id",
+          "service_date",
+          "hour",
+          "capacity",
+          "entries",
+          "exits",
+          "avg_free",
+          "avg_occupied",
+          "max_occupied"
+        ],
+        "title": "LotHourlyRow",
+        "type": "object"
+      },
       "LotOut": {
         "properties": {
           "capacity": {
@@ -505,6 +803,140 @@
           "gates"
         ],
         "title": "LotOut",
+        "type": "object"
+      },
+      "LotReportSummary": {
+        "description": "One lot over the requested range. Range-level stay figures are means of the daily\nfigures, never percentiles of pooled stays.",
+        "properties": {
+          "avg_daily_entries": {
+            "title": "Avg Daily Entries",
+            "type": "number"
+          },
+          "avg_daily_unique_students": {
+            "title": "Avg Daily Unique Students",
+            "type": "number"
+          },
+          "avg_stay_min": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Mean of the daily average stay (minutes).",
+            "title": "Avg Stay Min"
+          },
+          "avg_turnover": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Turnover"
+          },
+          "closed_by_reconciliation": {
+            "title": "Closed By Reconciliation",
+            "type": "integer"
+          },
+          "days": {
+            "description": "Days with data in the range.",
+            "title": "Days",
+            "type": "integer"
+          },
+          "entries": {
+            "title": "Entries",
+            "type": "integer"
+          },
+          "exit_only": {
+            "title": "Exit Only",
+            "type": "integer"
+          },
+          "exits": {
+            "title": "Exits",
+            "type": "integer"
+          },
+          "from_date": {
+            "format": "date",
+            "title": "From Date",
+            "type": "string"
+          },
+          "lot_id": {
+            "title": "Lot Id",
+            "type": "string"
+          },
+          "min_free": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Free"
+          },
+          "minutes_full": {
+            "title": "Minutes Full",
+            "type": "number"
+          },
+          "missing_exit": {
+            "title": "Missing Exit",
+            "type": "integer"
+          },
+          "p90_stay_min": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Mean of the daily p90 stay (minutes); not a p90 of the whole range.",
+            "title": "P90 Stay Min"
+          },
+          "peak_occupied": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Peak Occupied"
+          },
+          "to_date": {
+            "format": "date",
+            "title": "To Date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "lot_id",
+          "from_date",
+          "to_date",
+          "days",
+          "entries",
+          "exits",
+          "avg_daily_entries",
+          "avg_daily_unique_students",
+          "peak_occupied",
+          "min_free",
+          "minutes_full",
+          "avg_stay_min",
+          "p90_stay_min",
+          "avg_turnover",
+          "closed_by_reconciliation",
+          "exit_only",
+          "missing_exit"
+        ],
+        "title": "LotReportSummary",
         "type": "object"
       },
       "LotUpsert": {
@@ -560,6 +992,74 @@
           "rejected"
         ],
         "title": "MinuteCount",
+        "type": "object"
+      },
+      "OccupancySlot": {
+        "properties": {
+          "capacity": {
+            "title": "Capacity",
+            "type": "integer"
+          },
+          "free_end": {
+            "title": "Free End",
+            "type": "integer"
+          },
+          "free_min": {
+            "title": "Free Min",
+            "type": "integer"
+          },
+          "lot_id": {
+            "title": "Lot Id",
+            "type": "string"
+          },
+          "occupied_avg": {
+            "title": "Occupied Avg",
+            "type": "number"
+          },
+          "occupied_end": {
+            "title": "Occupied End",
+            "type": "integer"
+          },
+          "occupied_max": {
+            "title": "Occupied Max",
+            "type": "integer"
+          },
+          "seconds_full": {
+            "title": "Seconds Full",
+            "type": "integer"
+          },
+          "service_date": {
+            "format": "date",
+            "title": "Service Date",
+            "type": "string"
+          },
+          "slot_key": {
+            "description": "0 is 00:00-00:15 local.",
+            "maximum": 95.0,
+            "minimum": 0.0,
+            "title": "Slot Key",
+            "type": "integer"
+          },
+          "slot_start": {
+            "format": "date-time",
+            "title": "Slot Start",
+            "type": "string"
+          }
+        },
+        "required": [
+          "lot_id",
+          "service_date",
+          "slot_key",
+          "slot_start",
+          "occupied_end",
+          "occupied_max",
+          "occupied_avg",
+          "capacity",
+          "free_end",
+          "free_min",
+          "seconds_full"
+        ],
+        "title": "OccupancySlot",
         "type": "object"
       },
       "PipelineRunOut": {
@@ -795,6 +1295,86 @@
         "title": "Problem",
         "type": "object"
       },
+      "QualityDailyRow": {
+        "description": "lot_id '-1' collects rejects without a known lot.",
+        "properties": {
+          "closed_by_reconciliation": {
+            "title": "Closed By Reconciliation",
+            "type": "integer"
+          },
+          "exit_only": {
+            "title": "Exit Only",
+            "type": "integer"
+          },
+          "lot_id": {
+            "title": "Lot Id",
+            "type": "string"
+          },
+          "missing_exit": {
+            "title": "Missing Exit",
+            "type": "integer"
+          },
+          "rejects_direction_mismatch": {
+            "title": "Rejects Direction Mismatch",
+            "type": "integer"
+          },
+          "rejects_event_id_conflict": {
+            "title": "Rejects Event Id Conflict",
+            "type": "integer"
+          },
+          "rejects_in_future": {
+            "title": "Rejects In Future",
+            "type": "integer"
+          },
+          "rejects_lot_mismatch": {
+            "title": "Rejects Lot Mismatch",
+            "type": "integer"
+          },
+          "rejects_schema_invalid": {
+            "title": "Rejects Schema Invalid",
+            "type": "integer"
+          },
+          "rejects_too_old": {
+            "title": "Rejects Too Old",
+            "type": "integer"
+          },
+          "rejects_total": {
+            "title": "Rejects Total",
+            "type": "integer"
+          },
+          "rejects_unknown_gate": {
+            "title": "Rejects Unknown Gate",
+            "type": "integer"
+          },
+          "rejects_unknown_student": {
+            "title": "Rejects Unknown Student",
+            "type": "integer"
+          },
+          "service_date": {
+            "format": "date",
+            "title": "Service Date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "service_date",
+          "lot_id",
+          "rejects_total",
+          "rejects_schema_invalid",
+          "rejects_unknown_gate",
+          "rejects_unknown_student",
+          "rejects_lot_mismatch",
+          "rejects_direction_mismatch",
+          "rejects_in_future",
+          "rejects_too_old",
+          "rejects_event_id_conflict",
+          "closed_by_reconciliation",
+          "exit_only",
+          "missing_exit"
+        ],
+        "title": "QualityDailyRow",
+        "type": "object"
+      },
       "Readiness": {
         "properties": {
           "database": {
@@ -988,13 +1568,100 @@
         "title": "RejectPage",
         "type": "object"
       },
+      "ReportFreshness": {
+        "description": "How old the warehouse data is. Every field is null before the first successful run.",
+        "properties": {
+          "age_s": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Seconds since finished_at.",
+            "title": "Age S"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When that run finished.",
+            "title": "Finished At"
+          },
+          "last_run_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Latest successful warehouse run.",
+            "title": "Last Run Id"
+          },
+          "mode": {
+            "anyOf": [
+              {
+                "enum": [
+                  "incremental",
+                  "full"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Mode of that run.",
+            "title": "Mode"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "queued",
+                  "running",
+                  "succeeded",
+                  "failed"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Status of the most recent warehouse run of any outcome (queued, running, succeeded, failed): a failed refresh shows here while the data stays as of finished_at.",
+            "title": "Status"
+          }
+        },
+        "required": [
+          "last_run_id",
+          "finished_at",
+          "mode",
+          "status",
+          "age_s"
+        ],
+        "title": "ReportFreshness",
+        "type": "object"
+      },
       "RunRequest": {
         "additionalProperties": false,
         "properties": {
           "job": {
             "enum": [
               "daily",
-              "close_day"
+              "close_day",
+              "warehouse"
             ],
             "title": "Job",
             "type": "string"
@@ -1002,14 +1669,18 @@
           "mode": {
             "anyOf": [
               {
-                "const": "export",
+                "enum": [
+                  "export",
+                  "incremental",
+                  "full"
+                ],
                 "type": "string"
               },
               {
                 "type": "null"
               }
             ],
-            "description": "`export` re-exports the day without closing it (close_day only).",
+            "description": "close_day: `export` re-exports the day without closing it. warehouse: `incremental` (default, `dbt build`) or `full` (`dbt source freshness` and `dbt build --full-refresh`). daily takes no mode.",
             "title": "Mode"
           },
           "service_date": {
@@ -1022,7 +1693,7 @@
                 "type": "null"
               }
             ],
-            "description": "A past local date; defaults to yesterday in the service time zone.",
+            "description": "daily and close_day: a past local date, default yesterday. warehouse: today or a past date (it only labels the run), default today. Service time zone.",
             "title": "Service Date"
           }
         },
@@ -1051,6 +1722,66 @@
           "student_refs"
         ],
         "title": "StudentBulkUpsert",
+        "type": "object"
+      },
+      "WeekdayRow": {
+        "description": "Daily means per lot and weekday over the range, holidays excluded.",
+        "properties": {
+          "avg_entries": {
+            "title": "Avg Entries",
+            "type": "number"
+          },
+          "avg_exits": {
+            "title": "Avg Exits",
+            "type": "number"
+          },
+          "avg_peak_occupied": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Peak Occupied"
+          },
+          "avg_unique_students": {
+            "title": "Avg Unique Students",
+            "type": "number"
+          },
+          "days": {
+            "title": "Days",
+            "type": "integer"
+          },
+          "iso_day_of_week": {
+            "description": "1 Monday to 7 Sunday.",
+            "maximum": 7.0,
+            "minimum": 1.0,
+            "title": "Iso Day Of Week",
+            "type": "integer"
+          },
+          "lot_id": {
+            "title": "Lot Id",
+            "type": "string"
+          },
+          "weekday_name": {
+            "description": "Portuguese weekday name.",
+            "title": "Weekday Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "lot_id",
+          "iso_day_of_week",
+          "weekday_name",
+          "days",
+          "avg_entries",
+          "avg_exits",
+          "avg_unique_students",
+          "avg_peak_occupied"
+        ],
+        "title": "WeekdayRow",
         "type": "object"
       }
     },
@@ -1775,7 +2506,7 @@
         ]
       },
       "post": {
-        "description": "Queues `daily` or `close_day` for a past service date (default: yesterday). The worker picks it up; poll `GET /operator/runs/{run_id}`. 409 when one is already queued or running for the same job and date.",
+        "description": "Queues `daily` or `close_day` for a past service date (default: yesterday), or `warehouse` for today or a past date (default: today). The worker picks it up; poll `GET /operator/runs/{run_id}`. 409 when one is already queued or running for the same job and date.",
         "operationId": "post_run_api_v1_operator_runs_post",
         "requestBody": {
           "content": {
@@ -1908,6 +2639,835 @@
         ]
       }
     },
+    "/api/v1/reports/daily": {
+      "get": {
+        "description": "Traffic, dwell, occupancy and quality counts per lot and day. Range: `from` and `to` (local dates, inclusive; default the last 30 days, at most 366 days). Without `lot_id`, one series per lot. Cached per warehouse run: send the `ETag` back in `If-None-Match` for a 304.",
+        "operationId": "daily_api_v1_reports_daily_get",
+        "parameters": [
+          {
+            "description": "First local date (inclusive).",
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "First local date (inclusive).",
+              "title": "From"
+            }
+          },
+          {
+            "description": "Last local date (inclusive).",
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Last local date (inclusive).",
+              "title": "To"
+            }
+          },
+          {
+            "description": "Only this lot.",
+            "in": "query",
+            "name": "lot_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^[a-z0-9-]{2,40}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only this lot.",
+              "title": "Lot Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/LotDailyRow"
+                  },
+                  "title": "Response Daily Api V1 Reports Daily Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "304": {
+            "description": "Not Modified: the ETag sent in If-None-Match still matches."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)."
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)."
+          }
+        },
+        "summary": "One row per lot and day",
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/reports/dwell": {
+      "get": {
+        "description": "All six buckets per lot, summed over the range. Range: `from` and `to` (local dates, inclusive; default the last 30 days, at most 366 days). Without `lot_id`, one series per lot. Cached per warehouse run: send the `ETag` back in `If-None-Match` for a 304.",
+        "operationId": "dwell_api_v1_reports_dwell_get",
+        "parameters": [
+          {
+            "description": "First local date (inclusive).",
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "First local date (inclusive).",
+              "title": "From"
+            }
+          },
+          {
+            "description": "Last local date (inclusive).",
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Last local date (inclusive).",
+              "title": "To"
+            }
+          },
+          {
+            "description": "Only this lot.",
+            "in": "query",
+            "name": "lot_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^[a-z0-9-]{2,40}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only this lot.",
+              "title": "Lot Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DwellBucketRow"
+                  },
+                  "title": "Response Dwell Api V1 Reports Dwell Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "304": {
+            "description": "Not Modified: the ETag sent in If-None-Match still matches."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)."
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)."
+          }
+        },
+        "summary": "Closed stays per duration bucket",
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/reports/freshness": {
+      "get": {
+        "description": "The latest successful warehouse run and the status of the most recent one.",
+        "operationId": "freshness_api_v1_reports_freshness_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportFreshness"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Age of the warehouse data",
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/reports/hourly": {
+      "get": {
+        "description": "Hours that have started. Range: `from` and `to` (local dates, inclusive; default the last 30 days, at most 31 days). Without `lot_id`, one series per lot. Cached per warehouse run: send the `ETag` back in `If-None-Match` for a 304.",
+        "operationId": "hourly_api_v1_reports_hourly_get",
+        "parameters": [
+          {
+            "description": "First local date (inclusive).",
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "First local date (inclusive).",
+              "title": "From"
+            }
+          },
+          {
+            "description": "Last local date (inclusive).",
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Last local date (inclusive).",
+              "title": "To"
+            }
+          },
+          {
+            "description": "Only this lot.",
+            "in": "query",
+            "name": "lot_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^[a-z0-9-]{2,40}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only this lot.",
+              "title": "Lot Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/LotHourlyRow"
+                  },
+                  "title": "Response Hourly Api V1 Reports Hourly Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "304": {
+            "description": "Not Modified: the ETag sent in If-None-Match still matches."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)."
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)."
+          }
+        },
+        "summary": "One row per lot, day and hour",
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/reports/occupancy": {
+      "get": {
+        "description": "Slots of `date` (default today, local) that have started; the current one ends now. Without `lot_id`, every lot. Cached per warehouse run, with ETags.",
+        "operationId": "occupancy_api_v1_reports_occupancy_get",
+        "parameters": [
+          {
+            "description": "Local date.",
+            "in": "query",
+            "name": "date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Local date.",
+              "title": "Date"
+            }
+          },
+          {
+            "description": "Only this lot.",
+            "in": "query",
+            "name": "lot_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^[a-z0-9-]{2,40}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only this lot.",
+              "title": "Lot Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/OccupancySlot"
+                  },
+                  "title": "Response Occupancy Api V1 Reports Occupancy Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "304": {
+            "description": "Not Modified: the ETag sent in If-None-Match still matches."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)."
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)."
+          }
+        },
+        "summary": "15-minute occupancy slots of one day",
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/reports/quality": {
+      "get": {
+        "description": "Rejects by reason and reconciled stays; lot '-1' holds rejects without a known lot. Range: `from` and `to` (local dates, inclusive; default the last 30 days, at most 366 days). Without `lot_id`, one series per lot. Cached per warehouse run: send the `ETag` back in `If-None-Match` for a 304.",
+        "operationId": "quality_api_v1_reports_quality_get",
+        "parameters": [
+          {
+            "description": "First local date (inclusive).",
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "First local date (inclusive).",
+              "title": "From"
+            }
+          },
+          {
+            "description": "Last local date (inclusive).",
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Last local date (inclusive).",
+              "title": "To"
+            }
+          },
+          {
+            "description": "Only this lot.",
+            "in": "query",
+            "name": "lot_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^[a-z0-9-]{2,40}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only this lot.",
+              "title": "Lot Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/QualityDailyRow"
+                  },
+                  "title": "Response Quality Api V1 Reports Quality Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "304": {
+            "description": "Not Modified: the ETag sent in If-None-Match still matches."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)."
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)."
+          }
+        },
+        "summary": "Data quality per day and lot",
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/reports/summary": {
+      "get": {
+        "description": "Range-level stay figures are means of the daily figures. Range: `from` and `to` (local dates, inclusive; default the last 30 days, at most 366 days). Without `lot_id`, one series per lot. Cached per warehouse run: send the `ETag` back in `If-None-Match` for a 304.",
+        "operationId": "summary_api_v1_reports_summary_get",
+        "parameters": [
+          {
+            "description": "First local date (inclusive).",
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "First local date (inclusive).",
+              "title": "From"
+            }
+          },
+          {
+            "description": "Last local date (inclusive).",
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Last local date (inclusive).",
+              "title": "To"
+            }
+          },
+          {
+            "description": "Only this lot.",
+            "in": "query",
+            "name": "lot_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^[a-z0-9-]{2,40}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only this lot.",
+              "title": "Lot Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/LotReportSummary"
+                  },
+                  "title": "Response Summary Api V1 Reports Summary Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "304": {
+            "description": "Not Modified: the ETag sent in If-None-Match still matches."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)."
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)."
+          }
+        },
+        "summary": "Totals per lot over a range",
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/reports/weekday": {
+      "get": {
+        "description": "Holidays are excluded. Range: `from` and `to` (local dates, inclusive; default the last 30 days, at most 366 days). Without `lot_id`, one series per lot. Cached per warehouse run: send the `ETag` back in `If-None-Match` for a 304.",
+        "operationId": "weekday_api_v1_reports_weekday_get",
+        "parameters": [
+          {
+            "description": "First local date (inclusive).",
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "First local date (inclusive).",
+              "title": "From"
+            }
+          },
+          {
+            "description": "Last local date (inclusive).",
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Last local date (inclusive).",
+              "title": "To"
+            }
+          },
+          {
+            "description": "Only this lot.",
+            "in": "query",
+            "name": "lot_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^[a-z0-9-]{2,40}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only this lot.",
+              "title": "Lot Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/WeekdayRow"
+                  },
+                  "title": "Response Weekday Api V1 Reports Weekday Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "304": {
+            "description": "Not Modified: the ETag sent in If-None-Match still matches."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)."
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details (RFC 9457)."
+          }
+        },
+        "summary": "Daily means per lot and weekday",
+        "tags": [
+          "reports"
+        ]
+      }
+    },
     "/healthz": {
       "get": {
         "operationId": "healthz_healthz_get",
@@ -1981,6 +3541,10 @@
     {
       "description": "Gate-event intake (ingest API key).",
       "name": "ingestion"
+    },
+    {
+      "description": "Daily evolution from the warehouse marts (dbt).",
+      "name": "reports"
     },
     {
       "description": "Ingestion health, rejects and pipeline runs (operator API key).",

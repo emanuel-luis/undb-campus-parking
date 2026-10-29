@@ -1,0 +1,155 @@
+version: 2
+
+models:
+  - name: fct_gate_event
+    description: >
+      Grain: one accepted gate event (event_id). Incremental delete+insert on event_id over the
+      rows received since max(received_at) minus var lookback_minutes. slot_key and hour are
+      the local time of occurred_at; lot_key is the lot version in force on the service date.
+    columns:
+      - name: event_id
+        data_tests: [unique, not_null]
+      - name: date_key
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_date')
+                field: date_key
+      - name: slot_key
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_time')
+                field: slot_key
+      - name: lot_key
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_lot')
+                field: lot_key
+      - name: gate_key
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_gate')
+                field: gate_key
+      - name: student_key
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_student')
+                field: student_key
+      - name: direction
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [entry, exit]
+
+  - name: fct_stay
+    description: >
+      Grain: one stay (stay_id): an entry-exit pair, or an entry or exit alone. Incremental
+      delete+insert on (lot_id, service_date) partitions: every partition with a stay updated
+      since max(updated_at) minus var lookback_minutes is rebuilt whole. duration_s and
+      duration_bucket are set for closed stays only.
+    columns:
+      - name: stay_id
+        data_tests: [unique, not_null]
+      - name: date_key
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_date')
+                field: date_key
+      - name: lot_key
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_lot')
+                field: lot_key
+      - name: student_key
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_student')
+                field: student_key
+      - name: status
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [open, closed, missing_exit, exit_only, closed_by_reconciliation]
+
+  - name: fct_occupancy_snapshot
+    description: >
+      Grain: lot x local day x 15-minute slot, for slots that have started (the current slot
+      ends at now). occupied_end is the count of stays inside at the slot end, occupied_max and
+      occupied_avg (time-weighted) are over the slot, free_end and free_min are capacity minus
+      those (never below 0), seconds_full is the time with occupied >= capacity. Incremental
+      delete+insert on (lot_id, service_date): partitions of stays changed since max(built_at)
+      minus var lookback_minutes, the day after each, and yesterday and today for every lot.
+    data_tests:
+      - unique_combination:
+          arguments:
+            columns: [lot_id, service_date, slot_key]
+    columns:
+      - name: date_key
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_date')
+                field: date_key
+      - name: slot_key
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_time')
+                field: slot_key
+      - name: lot_key
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_lot')
+                field: lot_key
+
+unit_tests:
+  - name: occupancy_step_function
+    description: >
+      Stays in one lot of capacity 3 between 08:00 and 09:00 local (UTC-3): A 08:05-08:30 (exit
+      exactly on a slot boundary), B from 08:10 and still open, C 08:40-08:50, D 08:15-08:45
+      (entry and exit exactly on boundaries: they belong to the slot that starts there), and an
+      exit-only stay at 08:20 that never counts. Checks the level at each slot end, the peak,
+      the time-weighted average and the seconds at full capacity.
+    model: fct_occupancy_snapshot
+    overrides:
+      macros:
+        is_incremental: false
+        as_of: "timestamptz '2026-10-28 14:40:00+00'"
+    given:
+      - input: ref('int_stays_classified')
+        rows:
+          - {lot_id: p, service_date: 2026-10-28, entered_at: "2026-10-28 11:05:00+00", ended_at: "2026-10-28 11:30:00+00", updated_at: "2026-10-28 11:30:00+00"}
+          - {lot_id: p, service_date: 2026-10-28, entered_at: "2026-10-28 11:10:00+00", ended_at: null, updated_at: "2026-10-28 11:10:00+00"}
+          - {lot_id: p, service_date: 2026-10-28, entered_at: "2026-10-28 11:40:00+00", ended_at: "2026-10-28 11:50:00+00", updated_at: "2026-10-28 11:50:00+00"}
+          - {lot_id: p, service_date: 2026-10-28, entered_at: "2026-10-28 11:15:00+00", ended_at: "2026-10-28 11:45:00+00", updated_at: "2026-10-28 11:45:00+00"}
+          - {lot_id: p, service_date: 2026-10-28, entered_at: null, ended_at: "2026-10-28 11:20:00+00", updated_at: "2026-10-28 11:20:00+00"}
+      - input: ref('dim_lot')
+        rows:
+          - {lot_key: k1, lot_id: p, capacity: 3, valid_from: 2026-01-01, valid_to: 9999-12-31}
+      - input: ref('dim_time')
+        rows:
+          - {slot_key: 32, slot_start: "08:00:00"}
+          - {slot_key: 33, slot_start: "08:15:00"}
+          - {slot_key: 34, slot_start: "08:30:00"}
+          - {slot_key: 35, slot_start: "08:45:00"}
+    expect:
+      rows:
+        - {slot_key: 32, occupied_end: 2, occupied_max: 2, occupied_avg: 1.00, free_end: 1, free_min: 1, seconds_full: 0}
+        - {slot_key: 33, occupied_end: 3, occupied_max: 3, occupied_avg: 3.00, free_end: 0, free_min: 0, seconds_full: 900}
+        - {slot_key: 34, occupied_end: 3, occupied_max: 3, occupied_avg: 2.33, free_end: 0, free_min: 0, seconds_full: 300}
+        - {slot_key: 35, occupied_end: 1, occupied_max: 2, occupied_avg: 1.33, free_end: 2, free_min: 1, seconds_full: 0}
