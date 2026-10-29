@@ -37,6 +37,20 @@ jobs:
           uv export --project generator --frozen --all-extras --all-groups --no-emit-project -o "$RUNNER_TEMP/generator-locked.txt"
           uvx pip-audit==2.10.1 --disable-pip --progress-spinner off -r "$RUNNER_TEMP/generator-locked.txt"
 
+  npm-audit:
+    name: npm audit (known vulnerabilities in package-lock.json)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with: { node-version-file: .nvmrc }
+      # Production dependencies only; the dev tooling never ships.
+      - run: npm audit --omit=dev --audit-level=high
+
   zizmor:
     name: zizmor (GitHub Actions workflows)
     runs-on: ubuntu-latest
