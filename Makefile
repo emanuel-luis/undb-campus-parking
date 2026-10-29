@@ -4,7 +4,8 @@ SHELL := bash
 
 .PHONY: help install lint format test test-fast migrate up-db down test-integration openapi \
 	openapi-check warehouse warehouse-full d2-install diagrams diagrams-check diagrams-watch backend-lint backend-test \
-	generator-install generator-lint generator-test gen-generator-models generator-models-check
+	generator-install generator-lint generator-test gen-generator-models generator-models-check \
+	js-install js-lint js-test api-client api-client-check
 
 help: ## list the targets
 	@grep -hE '^[a-zA-Z0-9_-]+:.*## ' $(MAKEFILE_LIST) | sort | \
@@ -62,7 +63,7 @@ install: ## install the backend (with the dbt group) and generator environments 
 	$(BACKEND) sync --locked --group dbt
 	$(GENERATOR) sync --locked
 
-lint: backend-lint generator-lint ## everything CI lints: backend and generator
+lint: backend-lint generator-lint js-lint ## everything CI lints: backend, generator and the JS workspace (Node 24, see .nvmrc)
 
 backend-lint: ## ruff check, ruff format --check, mypy and the OpenAPI drift check (CI backend lint)
 	cd backend && uv run ruff check .
@@ -100,7 +101,27 @@ format: ## apply ruff fixes and formatting
 	cd generator && uv run ruff check --fix .
 	cd generator && uv run ruff format .
 
-test: backend-test generator-test ## pytest with the coverage gate (85%) in both projects, no Postgres needed
+test: backend-test generator-test js-test ## pytest and vitest with the 85% coverage gate, no Postgres needed (JS needs Node 24)
+
+# JavaScript: one npm workspace at the repo root (packages/*, apps/*). Needs Node 24 (.nvmrc) and
+# an install first (make js-install).
+js-install: ## npm ci from package-lock.json (Node 24 required)
+	npm ci
+
+js-lint: ## eslint, tsc and the schema.ts drift check (CI js job; Node 24 required)
+	npm run lint
+	npm run typecheck
+	@$(MAKE) --no-print-directory api-client-check
+
+js-test: ## vitest with the 85% coverage gate (CI js job; Node 24 required)
+	npm test
+
+api-client: ## regenerate packages/api-client/src/schema.ts from backend/openapi.json
+	npm run gen:api -w @undb-campus-parking/api-client
+
+api-client-check: api-client ## regenerate schema.ts and fail if it differs from the committed one
+	@git diff --exit-code -- packages/api-client/src/schema.ts || { \
+		echo "schema.ts is stale: run make api-client and commit" >&2; exit 1; }
 
 backend-test: ## backend pytest with the coverage gate (CI backend test)
 	cd backend && uv run pytest
