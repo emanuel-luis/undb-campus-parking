@@ -75,7 +75,11 @@ class Env:
 
 @pytest.fixture
 async def env(tmp_path: Path, client_for: Callable[[FastAPI], Any]) -> AsyncIterator[Env]:
+    # A file database, not the default `:memory:`: that one is a StaticPool, a single connection
+    # shared by every session, so the ROLLBACK of a request session closing (the test polls the
+    # API while the worker serves) discards the worker's uncommitted run status.
     settings = make_settings(
+        database_url=f"sqlite+aiosqlite:///{(tmp_path / 'jobs.db').as_posix()}",
         ingest_api_key=INGEST["X-API-Key"],
         admin_api_key=ADMIN["X-API-Key"],
         operator_api_key=OPERATOR["X-API-Key"],
