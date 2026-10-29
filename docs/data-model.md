@@ -77,7 +77,9 @@ for transactions that committed after a later one.
   nightly full refresh.
 
 The marts' lot-day spine comes from the snapshots, which need a capacity version covering the
-date: events before a lot's first `valid_from` stay out of the marts.
+date. A lot with events before its first `valid_from` is missing those days in the marts, and
+`mart_entries_match_facts` fails every build until the capacity history starts earlier; the
+generator's history starts on 2024-01-01.
 
 The worker runs `dbt build` every 15 minutes and `dbt source freshness` plus
 `dbt build --full-refresh` at the end of the daily run, so a missed partition lives at most a day.
