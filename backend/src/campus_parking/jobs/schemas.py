@@ -13,12 +13,21 @@ RunStatus = Literal["queued", "running", "succeeded", "failed"]
 class RunRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    job: Literal["daily", "close_day"]
+    job: JobName
     service_date: date | None = Field(
-        None, description="A past local date; defaults to yesterday in the service time zone."
+        None,
+        description=(
+            "daily and close_day: a past local date, default yesterday. warehouse: today or a "
+            "past date (it only labels the run), default today. Service time zone."
+        ),
     )
-    mode: Literal["export"] | None = Field(
-        None, description="`export` re-exports the day without closing it (close_day only)."
+    mode: Literal["export", "incremental", "full"] | None = Field(
+        None,
+        description=(
+            "close_day: `export` re-exports the day without closing it. warehouse: "
+            "`incremental` (default, `dbt build`) or `full` (`dbt source freshness` and "
+            "`dbt build --full-refresh`). daily takes no mode."
+        ),
     )
 
 

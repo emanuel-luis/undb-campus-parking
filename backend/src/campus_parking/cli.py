@@ -89,10 +89,10 @@ def _migrate(args: argparse.Namespace) -> int:
     return 0
 
 
-def _run_job(job: str, day: date | None) -> int:
+def _run_job(job: str, day: date | None, mode: str | None = None) -> int:
     settings = get_settings()
     configure_logging(settings)
-    return asyncio.run(run_once(settings, job, day))
+    return asyncio.run(run_once(settings, job, day, mode=mode))
 
 
 def _close_day(args: argparse.Namespace) -> int:
@@ -103,9 +103,13 @@ def _export(args: argparse.Namespace) -> int:
     return _run_job("export", args.date)
 
 
+def _warehouse(args: argparse.Namespace) -> int:
+    return _run_job("warehouse", args.date, "full" if args.full else "incremental")
+
+
 def _worker(args: argparse.Namespace) -> int:
     if args.once:
-        return _run_job(args.once, args.date)
+        return _run_job(args.once, args.date, "incremental" if args.once == "warehouse" else None)
     settings = get_settings()
     configure_logging(settings)
     return asyncio.run(run_worker(settings))
@@ -142,11 +146,20 @@ def build_parser() -> argparse.ArgumentParser:
     add_date(export, "service date (default: yesterday in the service time zone)")
     export.set_defaults(func=_export)
 
+    warehouse = sub.add_parser("warehouse", help="refresh the dbt warehouse now")
+    warehouse.add_argument(
+        "--full", action="store_true", help="source freshness and build --full-refresh"
+    )
+    add_date(warehouse, "date the run is recorded under: today (default) or a past date")
+    warehouse.set_defaults(func=_warehouse)
+
     worker = sub.add_parser("worker", help="run the batch worker (claims runs from the queue)")
     worker.add_argument(
-        "--once", choices=["daily", "close_day"], help="run this job now, then exit"
+        "--once",
+        choices=["daily", "close_day", "warehouse"],
+        help="run this job now, then exit (warehouse runs incremental)",
     )
-    add_date(worker, "with --once: the service date (default: yesterday)")
+    add_date(worker, "with --once: the service date (default: yesterday; warehouse: today)")
     worker.set_defaults(func=_worker)
     return parser
 

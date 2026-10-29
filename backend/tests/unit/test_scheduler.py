@@ -1,7 +1,7 @@
 from datetime import UTC, date, datetime, time
 from zoneinfo import ZoneInfo
 
-from campus_parking.jobs.scheduler import daily_due
+from campus_parking.jobs.scheduler import daily_due, warehouse_due
 
 TZ = ZoneInfo("America/Fortaleza")  # UTC-3, no DST
 RUN_AT = time(0, 30)
@@ -30,3 +30,10 @@ def test_the_local_date_decides_not_the_utc_date() -> None:
     assert daily_due(utc(1, 0), TZ, RUN_AT, set()) == date(2026, 10, 27)
     # 03:30 UTC on the 30th is 00:30 on the 30th locally: yesterday is the 29th.
     assert daily_due(utc(3, 30, day=30), TZ, RUN_AT, set()) == date(2026, 10, 29)
+
+
+def test_warehouse_is_due_when_never_run_or_after_the_interval() -> None:
+    now = utc(12, 0)
+    assert warehouse_due(now, None, 15)
+    assert not warehouse_due(now, utc(11, 46), 15)
+    assert warehouse_due(now, utc(11, 45), 15)

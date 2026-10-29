@@ -20,6 +20,16 @@ class CapacityPeriod(BaseModel):
     valid_from: Annotated[date, Field(title='Valid From')]
 
 
+class DwellBucketRow(BaseModel):
+    bucket_order: Annotated[int, Field(title='Bucket Order')]
+    duration_bucket: Annotated[
+        Literal['<30m', '30-60m', '1-2h', '2-4h', '4-6h', '>6h'],
+        Field(title='Duration Bucket'),
+    ]
+    lot_id: Annotated[str, Field(title='Lot Id')]
+    stays: Annotated[int, Field(title='Stays')]
+
+
 class GateEvent(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
@@ -107,6 +117,53 @@ class LotAvailability(BaseModel):
     ]
 
 
+class LotDailyRow(BaseModel):
+    avg_stay_min: Annotated[float | None, Field(title='Avg Stay Min')]
+    capacity: Annotated[int | None, Field(title='Capacity')]
+    closed_by_reconciliation: Annotated[int, Field(title='Closed By Reconciliation')]
+    entries: Annotated[int, Field(title='Entries')]
+    entries_ma7: Annotated[
+        float | None,
+        Field(
+            description='Mean entries of the day and the 6 before.', title='Entries Ma7'
+        ),
+    ]
+    exit_only: Annotated[int, Field(title='Exit Only')]
+    exits: Annotated[int, Field(title='Exits')]
+    lot_id: Annotated[str, Field(title='Lot Id')]
+    median_stay_min: Annotated[float | None, Field(title='Median Stay Min')]
+    min_free: Annotated[int | None, Field(title='Min Free')]
+    minutes_full: Annotated[float | None, Field(title='Minutes Full')]
+    missing_exit: Annotated[int, Field(title='Missing Exit')]
+    p90_stay_min: Annotated[float | None, Field(title='P90 Stay Min')]
+    peak_occupied: Annotated[int | None, Field(title='Peak Occupied')]
+    peak_slot: Annotated[
+        str | None,
+        Field(
+            description='HH:MM start of the first slot at the peak.', title='Peak Slot'
+        ),
+    ]
+    service_date: Annotated[date, Field(title='Service Date')]
+    stays: Annotated[int, Field(title='Stays')]
+    turnover: Annotated[
+        float | None,
+        Field(description='Stays with an entry per space.', title='Turnover'),
+    ]
+    unique_students: Annotated[int, Field(title='Unique Students')]
+
+
+class LotHourlyRow(BaseModel):
+    avg_free: Annotated[float | None, Field(title='Avg Free')]
+    avg_occupied: Annotated[float | None, Field(title='Avg Occupied')]
+    capacity: Annotated[int | None, Field(title='Capacity')]
+    entries: Annotated[int, Field(title='Entries')]
+    exits: Annotated[int, Field(title='Exits')]
+    hour: Annotated[int, Field(ge=0, le=23, title='Hour')]
+    lot_id: Annotated[str, Field(title='Lot Id')]
+    max_occupied: Annotated[int | None, Field(title='Max Occupied')]
+    service_date: Annotated[date, Field(title='Service Date')]
+
+
 class LotOut(BaseModel):
     capacity: Annotated[
         int | None,
@@ -126,6 +183,42 @@ class LotOut(BaseModel):
     name: Annotated[str, Field(title='Name')]
 
 
+class LotReportSummary(BaseModel):
+    avg_daily_entries: Annotated[float, Field(title='Avg Daily Entries')]
+    avg_daily_unique_students: Annotated[
+        float, Field(title='Avg Daily Unique Students')
+    ]
+    avg_stay_min: Annotated[
+        float | None,
+        Field(
+            description='Mean of the daily average stay (minutes).',
+            title='Avg Stay Min',
+        ),
+    ]
+    avg_turnover: Annotated[float | None, Field(title='Avg Turnover')]
+    closed_by_reconciliation: Annotated[int, Field(title='Closed By Reconciliation')]
+    days: Annotated[
+        int, Field(description='Days with data in the range.', title='Days')
+    ]
+    entries: Annotated[int, Field(title='Entries')]
+    exit_only: Annotated[int, Field(title='Exit Only')]
+    exits: Annotated[int, Field(title='Exits')]
+    from_date: Annotated[date, Field(title='From Date')]
+    lot_id: Annotated[str, Field(title='Lot Id')]
+    min_free: Annotated[int | None, Field(title='Min Free')]
+    minutes_full: Annotated[float, Field(title='Minutes Full')]
+    missing_exit: Annotated[int, Field(title='Missing Exit')]
+    p90_stay_min: Annotated[
+        float | None,
+        Field(
+            description='Mean of the daily p90 stay (minutes); not a p90 of the whole range.',
+            title='P90 Stay Min',
+        ),
+    ]
+    peak_occupied: Annotated[int | None, Field(title='Peak Occupied')]
+    to_date: Annotated[date, Field(title='To Date')]
+
+
 class LotUpsert(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
@@ -142,6 +235,22 @@ class MinuteCount(BaseModel):
     duplicates: Annotated[int, Field(title='Duplicates')]
     minute: Annotated[AwareDatetime, Field(title='Minute')]
     rejected: Annotated[int, Field(title='Rejected')]
+
+
+class OccupancySlot(BaseModel):
+    capacity: Annotated[int, Field(title='Capacity')]
+    free_end: Annotated[int, Field(title='Free End')]
+    free_min: Annotated[int, Field(title='Free Min')]
+    lot_id: Annotated[str, Field(title='Lot Id')]
+    occupied_avg: Annotated[float, Field(title='Occupied Avg')]
+    occupied_end: Annotated[int, Field(title='Occupied End')]
+    occupied_max: Annotated[int, Field(title='Occupied Max')]
+    seconds_full: Annotated[int, Field(title='Seconds Full')]
+    service_date: Annotated[date, Field(title='Service Date')]
+    slot_key: Annotated[
+        int, Field(description='0 is 00:00-00:15 local.', ge=0, le=95, title='Slot Key')
+    ]
+    slot_start: Annotated[AwareDatetime, Field(title='Slot Start')]
 
 
 class PipelineRunOut(BaseModel):
@@ -173,6 +282,25 @@ class Problem(BaseModel):
     status: Annotated[int, Field(title='Status')]
     title: Annotated[str, Field(title='Title')]
     type: Annotated[str, Field(title='Type')]
+
+
+class QualityDailyRow(BaseModel):
+    closed_by_reconciliation: Annotated[int, Field(title='Closed By Reconciliation')]
+    exit_only: Annotated[int, Field(title='Exit Only')]
+    lot_id: Annotated[str, Field(title='Lot Id')]
+    missing_exit: Annotated[int, Field(title='Missing Exit')]
+    rejects_direction_mismatch: Annotated[
+        int, Field(title='Rejects Direction Mismatch')
+    ]
+    rejects_event_id_conflict: Annotated[int, Field(title='Rejects Event Id Conflict')]
+    rejects_in_future: Annotated[int, Field(title='Rejects In Future')]
+    rejects_lot_mismatch: Annotated[int, Field(title='Rejects Lot Mismatch')]
+    rejects_schema_invalid: Annotated[int, Field(title='Rejects Schema Invalid')]
+    rejects_too_old: Annotated[int, Field(title='Rejects Too Old')]
+    rejects_total: Annotated[int, Field(title='Rejects Total')]
+    rejects_unknown_gate: Annotated[int, Field(title='Rejects Unknown Gate')]
+    rejects_unknown_student: Annotated[int, Field(title='Rejects Unknown Student')]
+    service_date: Annotated[date, Field(title='Service Date')]
 
 
 class Readiness(BaseModel):
@@ -240,22 +368,47 @@ class RejectPage(BaseModel):
     ]
 
 
+class ReportFreshness(BaseModel):
+    age_s: Annotated[
+        float | None, Field(description='Seconds since finished_at.', title='Age S')
+    ]
+    finished_at: Annotated[
+        AwareDatetime | None,
+        Field(description='When that run finished.', title='Finished At'),
+    ]
+    last_run_id: Annotated[
+        UUID | None,
+        Field(description='Latest successful warehouse run.', title='Last Run Id'),
+    ]
+    mode: Annotated[
+        Literal['incremental', 'full'] | None,
+        Field(description='Mode of that run.', title='Mode'),
+    ]
+    status: Annotated[
+        Literal['queued', 'running', 'succeeded', 'failed'] | None,
+        Field(
+            description='Status of the most recent warehouse run of any outcome (queued, running, succeeded, failed): a failed refresh shows here while the data stays as of finished_at.',
+            title='Status',
+        ),
+    ]
+
+
 class RunRequest(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
-    job: Annotated[Literal['daily', 'close_day'], Field(title='Job')]
+    job: Annotated[Literal['daily', 'close_day', 'warehouse'], Field(title='Job')]
     mode: Annotated[
-        Literal['export'] | None,
+        Literal['export', 'incremental', 'full'] | None,
         Field(
-            description='`export` re-exports the day without closing it (close_day only).',
+            description='close_day: `export` re-exports the day without closing it. warehouse: `incremental` (default, `dbt build`) or `full` (`dbt source freshness` and `dbt build --full-refresh`). daily takes no mode.',
             title='Mode',
         ),
     ] = None
     service_date: Annotated[
         date | None,
         Field(
-            description='A past local date; defaults to yesterday in the service time zone.',
+            description='daily and close_day: a past local date, default yesterday. warehouse: today or a past date (it only labels the run), default today. Service time zone.',
             title='Service Date',
         ),
     ] = None
@@ -277,6 +430,22 @@ class StudentBulkUpsert(BaseModel):
             min_length=1,
             title='Student Refs',
         ),
+    ]
+
+
+class WeekdayRow(BaseModel):
+    avg_entries: Annotated[float, Field(title='Avg Entries')]
+    avg_exits: Annotated[float, Field(title='Avg Exits')]
+    avg_peak_occupied: Annotated[float | None, Field(title='Avg Peak Occupied')]
+    avg_unique_students: Annotated[float, Field(title='Avg Unique Students')]
+    days: Annotated[int, Field(title='Days')]
+    iso_day_of_week: Annotated[
+        int,
+        Field(description='1 Monday to 7 Sunday.', ge=1, le=7, title='Iso Day Of Week'),
+    ]
+    lot_id: Annotated[str, Field(title='Lot Id')]
+    weekday_name: Annotated[
+        str, Field(description='Portuguese weekday name.', title='Weekday Name')
     ]
 
 

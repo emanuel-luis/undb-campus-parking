@@ -27,11 +27,21 @@ def _url() -> str:
     return Settings().database_url
 
 
+def include_name(name: str | None, type_: str, parent_names: object) -> bool:
+    """Keep autogenerate to schema public (dbt owns warehouse and warehouse_staging).
+
+    Alembic consults this filter for schemas only with include_schemas=True; without it, as
+    here, it compares the default schema alone. The filter keeps that true if someone turns
+    include_schemas on."""
+    return type_ != "schema" or name is None or name == "public"
+
+
 def run_migrations_offline() -> None:
     """Emit SQL to stdout without a database connection."""
     context.configure(
         url=_url(),
         target_metadata=target_metadata,
+        include_name=include_name,
         literal_binds=True,
         compare_type=True,
         dialect_opts={"paramstyle": "named"},
@@ -41,7 +51,12 @@ def run_migrations_offline() -> None:
 
 
 def _run(connection: Connection) -> None:
-    context.configure(connection=connection, target_metadata=target_metadata, compare_type=True)
+    context.configure(
+        connection=connection,
+        target_metadata=target_metadata,
+        include_name=include_name,
+        compare_type=True,
+    )
     with context.begin_transaction():
         context.run_migrations()
 

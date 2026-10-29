@@ -1,0 +1,31 @@
+version: 2
+
+sources:
+  - name: parking
+    schema: public
+    description: >
+      OLTP tables owned by Alembic (migrations 0001 to 0003) and written by the API and the
+      worker. dbt only reads them.
+    tables:
+      - name: gate_events
+        description: Append-only log of accepted gate events, one row per event_id.
+        config:
+          loaded_at_field: received_at
+          freshness:
+            warn_after: {count: 30, period: minute}
+            error_after: {count: 2, period: hour}
+      - name: stays
+        description: >
+          Stays derived from the events, one row per stay. The stays of a (lot, student, service
+          date) are deleted and re-inserted whenever one of its events arrives, so updated_at
+          marks every row that changed.
+      - name: lots
+        description: Parking lots, one row per lot_id.
+      - name: lot_capacity_history
+        description: Effective-dated capacity, one row per (lot_id, valid_from).
+      - name: gates
+        description: Turnstile gates, one row per gate_id; lot and direction never change.
+      - name: students
+        description: Pseudonymous students, one row per student_ref. No names or emails.
+      - name: ingest_rejects
+        description: Rejected gate-event items, one row per reject_id.

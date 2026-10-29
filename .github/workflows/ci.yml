@@ -126,7 +126,7 @@ jobs:
         run: make generator-test
 
   generator-e2e:
-    name: generator end to end (backend + Postgres)
+    name: end to end (generator, worker, warehouse)
     needs: [generator-lint]
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -152,6 +152,14 @@ jobs:
       PARKING_DATABASE_URL: postgresql+asyncpg://parking:parking@localhost:5432/parking
       GENERATOR_API_URL: http://127.0.0.1:8000
       GENERATOR_STUDENTS: "10000"
+      PARKING_DBT_PROJECT_DIR: backend/warehouse
+      PARKING_WORKER_METRICS_PORT: "0"
+      # dbt run by hand (dbt test); the worker derives the same values from the database URL.
+      DBT_PG_HOST: localhost
+      DBT_PG_PORT: "5432"
+      DBT_PG_USER: parking
+      DBT_PG_PASSWORD: parking
+      DBT_PG_DBNAME: parking
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -165,7 +173,7 @@ jobs:
           python-version: "3.12"
       - name: Sync both environments
         run: |
-          uv sync --locked --project backend
+          uv sync --locked --project backend --group dbt
           uv sync --locked --project generator
       - name: Generate ephemeral API keys
         run: |
@@ -199,6 +207,20 @@ jobs:
         run: >-
           uv run --project backend python scripts/e2e_check.py
           "$RUNNER_TEMP/backfill-1.log" "$RUNNER_TEMP/backfill-2.log"
+      - name: Worker paths
+        run: |
+          echo "PARKING_LAKE_DIR=$RUNNER_TEMP/lake" >> "$GITHUB_ENV"
+          echo "PARKING_WORKER_HEARTBEAT_FILE=$RUNNER_TEMP/worker-heartbeat" >> "$GITHUB_ENV"
+      - name: Close the days, export them and build the warehouse (worker --once daily)
+        run: uv run --project backend --group dbt campus-parking worker --once daily
+      - name: Checksum the marts
+        run: uv run --project backend python scripts/warehouse_check.py snapshot "$RUNNER_TEMP/marts.json"
+      - name: Incremental warehouse build (must leave the marts unchanged)
+        run: uv run --project backend --group dbt campus-parking warehouse
+      - name: dbt test
+        run: uv run --project backend --group dbt dbt test --project-dir backend/warehouse --profiles-dir backend/warehouse
+      - name: Check the marts and the report routes
+        run: uv run --project backend python scripts/warehouse_check.py verify "$RUNNER_TEMP/marts.json"
       - name: API log on failure
         if: failure()
         run: tail -n 100 "$RUNNER_TEMP/api.log" || true

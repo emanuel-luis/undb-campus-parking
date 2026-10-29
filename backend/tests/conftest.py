@@ -36,6 +36,23 @@ def _isolated_settings(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     get_settings.cache_clear()
 
 
+@pytest.fixture(autouse=True)
+def fake_dbt(monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    """No test spawns dbt: the worker's warehouse job records its mode instead. Tests of
+    jobs/warehouse.py call that module directly."""
+    from campus_parking.jobs import worker
+    from campus_parking.jobs.runs import RunResult
+
+    calls: list[str] = []
+
+    async def fake(settings: Settings, mode: str, result: RunResult) -> None:
+        calls.append(mode)
+        result.metrics["mode"] = mode
+
+    monkeypatch.setattr(worker, "run_warehouse", fake)
+    return calls
+
+
 @pytest.fixture
 def settings() -> Settings:
     return make_settings()

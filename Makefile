@@ -3,7 +3,7 @@ SHELL := bash
 .DEFAULT_GOAL := help
 
 .PHONY: help install lint format test test-fast migrate up-db down test-integration openapi \
-	openapi-check d2-install diagrams diagrams-check diagrams-watch backend-lint backend-test \
+	openapi-check warehouse warehouse-full d2-install diagrams diagrams-check diagrams-watch backend-lint backend-test \
 	generator-install generator-lint generator-test gen-generator-models generator-models-check
 
 help: ## list the targets
@@ -58,8 +58,8 @@ diagrams-watch: ## live preview in the browser while editing: make diagrams-watc
 BACKEND := uv --project backend
 GENERATOR := uv --project generator
 
-install: ## install the backend and generator environments from their uv.lock files
-	$(BACKEND) sync --locked
+install: ## install the backend (with the dbt group) and generator environments from their uv.lock files
+	$(BACKEND) sync --locked --group dbt
 	$(GENERATOR) sync --locked
 
 lint: backend-lint generator-lint ## everything CI lints: backend and generator
@@ -113,6 +113,12 @@ test-fast: ## pytest -x -q without coverage
 
 migrate: ## apply the migrations to PARKING_DATABASE_URL (alembic upgrade head)
 	$(BACKEND) run campus-parking migrate
+
+warehouse: ## incremental dbt build of the warehouse as a recorded run (needs PARKING_DATABASE_URL)
+	$(BACKEND) run --group dbt campus-parking warehouse
+
+warehouse-full: ## source freshness and a full-refresh dbt build as a recorded run
+	$(BACKEND) run --group dbt campus-parking warehouse --full
 
 # Local Postgres from compose.yaml (service `postgres`). Integration tests use their own database
 # (parking_test, created on demand), never the application database `parking`.
