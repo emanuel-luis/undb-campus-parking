@@ -9,5 +9,7 @@ export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommended,
   reactHooks.configs.flat['recommended-latest'],
-  { languageOptions: { globals: { ...globals.browser, ...globals.node } } },
+  { languageOptions: { globals: globals.browser } },
+  // Node APIs only in tests and tool configs, so src/ stays portable to browsers and React Native.
+  { files: ['**/test/**', '**/*.config.{js,ts}'], languageOptions: { globals: globals.node } },
 )

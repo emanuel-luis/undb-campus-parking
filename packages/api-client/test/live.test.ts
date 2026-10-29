@@ -282,3 +282,59 @@ describe('pause, resume and close', () => {
     live.close()
   })
 })
+
+describe('stuck sockets and timer hygiene', () => {
+  it('treats a handshake that never completes as silent: polls and reconnects after 45 s', async () => {
+    const { live, fetchMock } = setup()
+    live.start()
+    expect(live.status).toBe('connecting')
+    await vi.advanceTimersByTimeAsync(44_999)
+    expect(fetchMock).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(1)
+    expect(live.status).toBe('polling')
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(FakeSocket.instances[0]?.closed).toBe(true)
+    await vi.advanceTimersByTimeAsync(500)
+    expect(FakeSocket.instances).toHaveLength(2)
+    live.close()
+  })
+
+  it('leaves no timer behind after close()', async () => {
+    const { live } = setup()
+    live.start()
+    last().open()
+    last().send(snap({ a: 1 }))
+    last().drop()
+    await vi.advanceTimersByTimeAsync(0)
+    live.close()
+    expect(vi.getTimerCount()).toBe(0)
+    expect(live.status).toBe('closed')
+  })
+
+  it('runs one poll chain after pause and resume during an in-flight fetch', async () => {
+    let release: (r: Response) => void = () => undefined
+    let calls = 0
+    const f = vi.fn<typeof fetch>(() => {
+      calls += 1
+      if (calls === 1) return new Promise<Response>((resolve) => (release = resolve))
+      return Promise.resolve(new Response(JSON.stringify(snap({ a: 7 }))))
+    })
+    const { live, snapshots } = setup({ fetch: f })
+    live.start()
+    last().drop() // poll chain 1: its fetch is now in flight
+    expect(calls).toBe(1)
+    live.pause()
+    live.resume()
+    last().drop() // poll chain 2 starts while chain 1 is still waiting
+    await vi.advanceTimersByTimeAsync(0)
+    expect(calls).toBe(2)
+    expect(snapshots).toHaveLength(1)
+    release(new Response(JSON.stringify(snap({ a: 1 })))) // the stale chain finishes late
+    await vi.advanceTimersByTimeAsync(0)
+    expect(snapshots).toHaveLength(1) // nothing merged from the old chain
+    await vi.advanceTimersByTimeAsync(10_000)
+    expect(calls).toBe(3) // one chain, one poll per 10 s
+    live.close()
+    expect(vi.getTimerCount()).toBe(0)
+  })
+})

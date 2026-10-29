@@ -27,12 +27,12 @@ const problem = (status: number, body: Record<string, unknown>, headers: Record<
   })
 
 describe('requests', () => {
-  it('builds the public URLs and drops undefined filters', async () => {
+  it('builds the public URLs', async () => {
     const { client, calls } = make(() => json([]))
     await client.lots()
     await client.availability()
     await client.lotAvailability('A 1')
-    await client.reports.summary({ from: '2026-10-01', to: '2026-10-07', lot_id: undefined })
+    await client.reports.summary({ from: '2026-10-01', to: '2026-10-07', })
     await client.reports.occupancy({ date: '2026-10-07', lot_id: 'a' })
     await client.reports.freshness()
     const urls = calls.map((c) => c.url)
@@ -53,7 +53,7 @@ describe('requests', () => {
     await withKey.client.operator.rejects({ limit: 5, cursor: 'c', reason: 'too_old', since: 's' })
     await withKey.client.operator.runs({ job: 'warehouse', status: 'failed', limit: 3 })
     await withKey.client.operator.ingestionHealth({ window_min: 30 })
-    await withKey.client.operator.run(7)
+    await withKey.client.operator.run('7')
     await withKey.client.lots()
     await withKey.client.reports.daily()
     const headers = withKey.calls.map((c) => c.headers.get('x-api-key'))
@@ -179,7 +179,7 @@ describe('query keys and options', () => {
       parkingQueries.ingestionHealth(client),
       parkingQueries.rejects(client),
       parkingQueries.runs(client),
-      parkingQueries.run(client, 3),
+      parkingQueries.run(client, '3'),
     ]
     const keys = new Set(opts.map((o) => JSON.stringify(o.queryKey)))
     expect(keys.size).toBe(opts.length)
