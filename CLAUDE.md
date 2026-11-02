@@ -9,19 +9,26 @@ design contract in `docs/REFACTOR_PLAN.md`, the end-to-end order in `docs/flow.m
 
 ```bash
 make help                                # every target
-make install | make js-install           # uv envs (backend with the dbt group, generator) | npm ci (Node 24)
+make install                             # uv envs: backend (with the dbt group) and generator
+make js-install                          # npm ci (Node 24)
 make lint                                # ruff, mypy, eslint, tsc + openapi, generator-models, schema.ts drift (= CI)
 make test                                # pytest (85% gates), Vitest, Jest, web build, Expo export
-make up-db && make test-integration      # Postgres-only tests (compose postgres, database parking_test)
+make up-db                               # compose Postgres for the next line
+make test-integration                    # Postgres-only tests (database parking_test)
 make test-fast                           # backend pytest -x -q, no coverage
 make openapi                             # regenerate backend/openapi.json after an API change
 make gen-generator-models                # then regenerate generator/src/turnstile_generator/api_models.py
 make api-client                          # and packages/api-client/src/schema.ts
-make warehouse | make warehouse-full     # dbt build as a recorded run (needs PARKING_DATABASE_URL)
-make demo | make smoke | make demo-down  # whole stack in Docker, end-to-end smoke, tear down
-make web-dev | make mobile-start         # Vite on :5173 | Expo (set EXPO_PUBLIC_API_BASE_URL first)
+make warehouse                           # incremental dbt build as a recorded run (needs PARKING_DATABASE_URL)
+make warehouse-full                      # source freshness + full-refresh build as a recorded run
+make demo                                # whole stack in Docker, backfill, daily run
+make smoke                               # end-to-end smoke through nginx (after make demo)
+make demo-down                           # stop the stack and delete its volumes
+make web-dev                             # Vite on :5173
+make mobile-start                        # Expo (set EXPO_PUBLIC_API_BASE_URL first)
 make d2-install                          # once: pinned D2 v0.9.0 (Linux x86_64, sha256 checked)
-make diagrams | make diagrams-check      # render docs/diagrams/*.d2; check = render + fail on diff (= CI)
+make diagrams                            # render docs/diagrams/*.d2
+make diagrams-check                      # render + fail on diff (= CI)
 make diagrams-watch NAME=<name>          # live preview of one diagram in the browser
 uv run --project backend campus-parking --help     # serve | worker | migrate | openapi | close-day | export | warehouse
 uv run --project generator turnstile-gen --help    # bootstrap | backfill | live | run | healthcheck

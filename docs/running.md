@@ -16,8 +16,16 @@ and builds the warehouse.
 
 ```bash
 make demo                         # 90 days of history
-make demo DEMO_BACKFILL_DAYS=7    # faster first run
 ```
+
+Or, for a faster first run:
+
+```bash
+make demo DEMO_BACKFILL_DAYS=7
+```
+
+A 30-day run took about 74 s for the backfill and about 43 s for the daily close and warehouse
+build; the default 90 days takes longer.
 
 `make demo` does four things (a rerun repeats them safely):
 

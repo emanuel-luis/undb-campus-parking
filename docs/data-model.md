@@ -34,6 +34,12 @@ schemas, so `alembic check` stays clean after a dbt build.
 
 Column-level detail is in [REFACTOR_PLAN.md](REFACTOR_PLAN.md#data-model) and the migrations.
 
+![ERD of the OLTP tables in schema public and their foreign keys.](diagrams/data-model-oltp.svg)
+
+Every arrow is a declared foreign key. `stays` has none: it is re-derived from `gate_events` per
+lot, student and service day. `pipeline_runs.parent_run_id` points to the daily run that started
+a child run. Source: [data-model-oltp.d2](diagrams/data-model-oltp.d2).
+
 ## Warehouse (dbt, `backend/warehouse`)
 
 The service time zone (`PARKING_TIMEZONE`, passed to dbt as var `timezone`) defines local dates,
@@ -60,6 +66,12 @@ hours and 15-minute slots. Student refs never leave staging: everything downstre
 
 Facts reference the dimensions by `date_key`, `slot_key`, `lot_key` (the version in force on
 the service date), `gate_key` and `student_key`; dbt `relationships` tests hold each one.
+
+![ERD of the warehouse dimensions and facts, one arrow per dbt relationships test.](diagrams/data-model-warehouse.svg)
+
+The three facts reference `dim_date`, `dim_time`, `dim_lot` (SCD2 on capacity, `-1` for an
+unknown lot), `dim_gate` and `dim_student`. The staging views mirror the OLTP tables and are left
+out. Source: [data-model-warehouse.d2](diagrams/data-model-warehouse.d2).
 
 ### Incremental strategy
 
@@ -108,6 +120,12 @@ not started are not built; the current one ends now. A dbt unit test pins the ar
 
 Medians and p90 are computed per lot and day in dbt; the API never computes a percentile and
 never adds percentiles across lots.
+
+![ERD of the four marts the reports API reads, with every contracted column.](diagrams/data-model-marts.svg)
+
+`mart_lot_daily`, `mart_lot_hourly`, `mart_lot_dwell_daily` and `mart_data_quality_daily` are
+tables with enforced contracts; their two relationships tests point to `dim_date` and `dim_lot`.
+Source: [data-model-marts.d2](diagrams/data-model-marts.d2).
 
 ### Tests
 

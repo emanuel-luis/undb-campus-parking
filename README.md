@@ -1,30 +1,16 @@
 # UNDB Campus Parking
 
-> Live free-space counts for the UNDB campus parking lots, built from turnstile events: an
-> idempotent ingestion API, an incremental occupancy counter pushed over WebSocket, a nightly
-> Parquet archive and a dbt warehouse behind the reports of a web app and an Expo mobile app.
+> Campus parking availability built from simulated turnstile events (a rebuilt UNDB course
+> project): an idempotent ingestion API, an incremental occupancy counter pushed over WebSocket,
+> a nightly Parquet archive and a dbt warehouse behind the reports of a web app and an Expo
+> mobile app.
 
 [![ci](https://github.com/emanuel-luis/undb-campus-parking/actions/workflows/ci.yml/badge.svg)](https://github.com/emanuel-luis/undb-campus-parking/actions/workflows/ci.yml)
 [![security](https://github.com/emanuel-luis/undb-campus-parking/actions/workflows/security.yml/badge.svg)](https://github.com/emanuel-luis/undb-campus-parking/actions/workflows/security.yml)
 
 Unofficial academic project, not affiliated with or endorsed by UNDB.
 
-## Origin
-
-This started in 2024 as the project of a mobile-programming course at UNDB (Centro Universitário
-Dom Bosco). The face-ID turnstiles at the campus lots record every car that enters or leaves, so
-the question was simple: how many spaces are free right now? I wrote the backend; a teammate
-wrote a mobile front-end that is not in this repository. The 2024 backend was two FastAPI
-services: a turnstile simulator that wrote Faker data to Parquet files, and a parking API that
-pulled everything from the simulator over HTTP on every request and paired entries with exits in
-pandas.
-
-In 2026 I rebuilt it as a small data system, keeping the UNDB identity and the original idea.
-The two services became one backend and a separate event generator; Parquet became the archive
-instead of the database; and the counts now come from an append-only event log, maintained
-incrementally and pushed to the clients as they change. The design is in
-[docs/REFACTOR_PLAN.md](docs/REFACTOR_PLAN.md) and every choice is logged in
-[docs/DECISIONS.md](docs/DECISIONS.md).
+![Web app, daily entries and exits with the 7-day moving average, and the hourly profile of entries and exits.](docs/screenshots/web-relatorios-charts.png)
 
 ## What this demonstrates
 
@@ -44,83 +30,13 @@ incrementally and pushed to the clients as they change. The design is in
 - **A Parquet archive with contract checks.** Each closed day is exported per service date, with
   events and rejects checked against the archive contract (schema, unique ids, row count) and
   published with a `_manifest.json` through an atomic directory swap, so a rerun is safe.
-- **A dbt star schema with tests and freshness.** dbt-postgres builds staging views, an SCD2 lot
-  dimension, three incremental facts and four marts with enforced contracts, plus relationships,
-  singular and unit tests and source freshness. CI builds it twice and checks the marts did not
-  change.
+- **A dbt star schema with tests and freshness.** dbt-postgres builds staging views, an
+  intermediate view, an SCD2 lot dimension, three incremental facts and four marts with enforced
+  contracts, plus relationships, singular and unit tests and source freshness. CI builds it twice
+  and checks the marts did not change.
 - **Typed clients from one OpenAPI contract.** `backend/openapi.json` is generated from the app
   and drift-checked; the generator's Pydantic models and the TypeScript client shared by web and
   mobile are generated from it and drift-checked too.
-
-## Data flow
-
-Gate events arrive through one contract, become an append-only log and a live counter, and are
-then archived and modelled for the reports.
-
-![Data flow: gate events pass the ingestion contract into gate_events (accepted) or ingest_rejects (rejected), with ingest_batches as per-POST run metadata. Pairing derives stays and the lot_occupancy counter, which the live availability REST and WebSocket serve. close_day exports events and rejects to a checked Parquet archive; dbt builds staging, dimensions, facts and marts with tests and freshness; the reports API reads the marts and uses pipeline_runs for freshness and its cache key.](docs/diagrams/data-flow.svg)
-
-Source: [data-flow.d2](docs/diagrams/data-flow.d2).
-
-| Layer | Objects | Guarantees |
-| --- | --- | --- |
-| Source | the generator (or a real gate) posting `POST /api/v1/events` | API keys per role, batch limits, backpressure with `Retry-After` |
-| Contract | `GateEvent` v1 (`ingestion/contract.py`) | Frozen schema, event-time bounds (120 days back, 300 s ahead), a reason for every reject |
-| Raw | `gate_events`, `ingest_rejects`, `ingest_batches` | Append-only events (trigger), dedupe on `event_id` + payload hash |
-| Processed | `stays`, `lot_occupancy` | Re-derived per lot, student and day; exact counter with a version |
-| Archive | `raw/gate_events/`, `raw/ingest_rejects/` Parquet per date | Contract check before publishing, manifest with row count and hashes, atomic swap |
-| Warehouse | `warehouse_staging` views; `warehouse` dimensions, facts and marts | dbt tests, source freshness, enforced mart contracts |
-| Serving | `/api/v1/availability`, `/api/v1/live/availability`, `/api/v1/reports/*` | Full snapshots over WebSocket; reports cached per warehouse run with ETag |
-| Run metadata | `pipeline_runs`, `service_days` | One row per job run; closed days; report freshness |
-
-### Architecture
-
-![Architecture: students use the web app behind nginx or the Expo Go app on the LAN; the operator uses the web operator page. Both apps call the FastAPI API over REST and WebSocket. The generator stands in for the face-ID gates and posts events and registry writes to the API. The API and the worker use Postgres; the worker runs dbt as a subprocess and writes the Parquet lake volume; migrate applies the schema.](docs/diagrams/architecture.svg)
-
-Source: [architecture.d2](docs/diagrams/architecture.d2).
-
-### User flows
-
-A car passing a gate, from the generator's POST to the snapshot the apps receive:
-
-![Sequence: the generator posts a batch with the ingest key; the API checks its concurrency slot (429 or 503 with Retry-After otherwise), validates each item, locks the touched lots, inserts gate_events with ON CONFLICT DO NOTHING, re-derives stays, bumps lot_occupancy and its version, records gate freshness, rejects and the batch, and answers 202. The live poller sees the new version within a second and pushes a full snapshot over the WebSocket.](docs/diagrams/user-flows-gate-event.svg)
-
-Source: [user-flows-gate-event.d2](docs/diagrams/user-flows-gate-event.d2).
-
-A student checking a lot, including reconnects and the REST fallback:
-
-![Sequence: the app opens one live subscription; the shared live client opens the WebSocket and gets a snapshot on connect, then one per version change or every 15 s. When the socket closes or stays silent for 45 s it polls GET /availability every 10 s and reconnects with jittered backoff up to 30 s. Hidden pages and background apps pause the socket and resume with a fresh snapshot.](docs/diagrams/user-flows-student.svg)
-
-Source: [user-flows-student.d2](docs/diagrams/user-flows-student.d2).
-
-The daily run, from the scheduler to the reports cache:
-
-![Sequence: after 00:30 local the worker queues the daily run for yesterday and claims it with FOR UPDATE SKIP LOCKED. For each pending date a close_day child closes open stays at local midnight, writes service_days, recounts and exports events and rejects to Parquet after the contract check. Then a warehouse/full child runs dbt source freshness and a full-refresh build with tests; the runs are recorded with metrics, and the reports API empties its cache when it sees the new warehouse run.](docs/diagrams/user-flows-daily-run.svg)
-
-Source: [user-flows-daily-run.d2](docs/diagrams/user-flows-daily-run.d2).
-
-The same flow as one ordered list is in [docs/flow.md](docs/flow.md).
-
-### Data model
-
-![ERD of the OLTP tables in schema public: lots, lot_capacity_history, gates, students, ingest_batches, gate_events, ingest_rejects, stays, lot_occupancy, pipeline_runs and service_days, with their foreign keys.](docs/diagrams/data-model-oltp.svg)
-
-Source: [data-model-oltp.d2](docs/diagrams/data-model-oltp.d2).
-
-![ERD of the warehouse star schema: fct_gate_event, fct_stay and fct_occupancy_snapshot referencing dim_date, dim_time, dim_lot (SCD2 on capacity), dim_gate and dim_student, one arrow per dbt relationships test.](docs/diagrams/data-model-warehouse.svg)
-
-Source: [data-model-warehouse.d2](docs/diagrams/data-model-warehouse.d2).
-
-![ERD of the four marts the reports API reads: mart_lot_daily, mart_lot_hourly, mart_lot_dwell_daily and mart_data_quality_daily, with every contracted column.](docs/diagrams/data-model-marts.svg)
-
-Source: [data-model-marts.d2](docs/diagrams/data-model-marts.d2). Grains and incremental rules
-are in [docs/data-model.md](docs/data-model.md).
-
-## Tech stack
-
-Python 3.12 · FastAPI · SQLAlchemy 2 (async) · Alembic · Postgres 17 · Pydantic · pyarrow ·
-dbt-postgres · Prometheus client · httpx · uv · ruff · mypy · pytest · Hypothesis · TypeScript ·
-React 19 · Vite · React Router · TanStack Query · ECharts · Expo SDK 57 (React Native, Expo
-Router) · openapi-typescript · Vitest · Jest · nginx · Docker Compose · GitHub Actions · D2
 
 ## Quickstart
 
@@ -130,15 +46,21 @@ WSL). Details and troubleshooting are in [docs/running.md](docs/running.md).
 ```bash
 git clone https://github.com/emanuel-luis/undb-campus-parking && cd undb-campus-parking
 make demo                         # 90 days of history (DEMO_BACKFILL_DAYS)
-make demo DEMO_BACKFILL_DAYS=7    # faster first run
-make smoke                        # REST and the live WebSocket through nginx
 ```
+
+Or, for a faster first run:
+
+```bash
+make demo DEMO_BACKFILL_DAYS=7
+```
+
+Then check REST and the live WebSocket through nginx with `make smoke`.
 
 `make demo` writes random API keys to `.env` (never printed), builds and starts the stack,
 backfills the history through the API and runs the daily job once, so the reports have data.
-For scale: a 30-day backfill posted 46,178 events (45,597 accepted, 454 duplicates and 127
-injected rejects), and the daily run that followed closed the 30 days and rebuilt the warehouse
-in about 43 seconds.
+Measured on a 30-day run: the backfill posted 46,178 events (45,597 accepted, 454 duplicates and
+127 injected rejects) in about 74 seconds, and the daily run that followed closed the 30 days and
+rebuilt the warehouse in about 43 seconds. The default 90 days takes longer.
 
 | What | Where |
 | --- | --- |
@@ -147,6 +69,72 @@ in about 43 seconds.
 | Operator key (Operador page) | `grep PARKING_OPERATOR_API_KEY .env` |
 
 `make demo-down` stops everything and deletes the volumes.
+
+## Data flow
+
+Gate events arrive through one contract, become an append-only log and a live counter, and are
+then archived and modeled for the reports.
+
+![Data flow from the gate event through raw, processed, archive and warehouse layers to the serving APIs and the apps.](docs/diagrams/data-flow.svg)
+
+| Layer | Objects | Guarantees |
+| --- | --- | --- |
+| Source | the generator (or a real gate) posting `POST /api/v1/events` | API keys per role, batch limits, backpressure with `Retry-After` |
+| Contract | `GateEvent` v1 (`ingestion/contract.py`) | Frozen schema, event-time bounds (120 days back, 300 s ahead), a reason for every reject |
+| Raw | `gate_events`, `ingest_rejects`, `ingest_batches` | Append-only events (trigger), dedupe on `event_id` + payload hash |
+| Processed | `stays`, `lot_occupancy` | Re-derived per lot, student and day; exact counter with a version |
+| Warehouse | `warehouse_staging` views (staging, `int_stays_classified`); `warehouse` dimensions, facts and marts | Built by dbt from Postgres; tests, source freshness, enforced mart contracts |
+| Serving | `/api/v1/availability`, `/api/v1/live/availability`, `/api/v1/reports/*` | Full snapshots over WebSocket; reports cached per warehouse run with ETag |
+| Archive (side output) | `raw/gate_events/`, `raw/ingest_rejects/` Parquet per date | Raw lake copy; dbt reads Postgres. Contract check before publishing, manifest with row count and hashes, atomic swap |
+| Run metadata | `pipeline_runs`, `service_days` | One row per job run; closed days; report freshness |
+
+![Architecture: the apps, the generator and the compose services, and the protocols between them.](docs/diagrams/architecture.svg)
+
+Click a diagram to open it at full size. The D2 sources are in
+[docs/diagrams/](docs/diagrams/).
+
+- The three user flows (a car passing a gate, a student checking a lot, the daily run) are drawn
+  next to their steps in [docs/flow.md](docs/flow.md).
+- The three ERDs (OLTP tables, warehouse dimensions and facts, marts) are next to their tables in
+  [docs/data-model.md](docs/data-model.md).
+
+## Screenshots
+
+From a local `make demo` run with a 30-day backfill.
+
+![Web, Vagas: each lot with its free spaces, a capacity bar, a status and the time of the last update.](docs/screenshots/web-vagas.png)
+
+![Web, Relatórios: date and lot filters, the warehouse freshness and the first KPI cards per lot.](docs/screenshots/web-relatorios.png)
+
+![Web, Operador: arrival lag and events per minute, rejects by reason and the gates.](docs/screenshots/web-operador.png)
+
+The Operador page counts every batch in its window. Its very high arrival lag is the backfill
+posting 30 days of past events in a few minutes, not a live delay, and its 45,604 accepted events
+are the 45,597 from the backfill plus the live traffic that arrived after it.
+
+<table>
+  <tr>
+    <td><img src="docs/screenshots/mobile-vagas.png" width="300" alt="Mobile, Vagas: the live lots with their free spaces and status."></td>
+    <td><img src="docs/screenshots/mobile-relatorios.png" width="300" alt="Mobile, Relatórios: lot and range filters, the freshness and KPI cards per lot."></td>
+  </tr>
+</table>
+
+## Origin
+
+This started in 2024 as the project of a mobile-programming course at UNDB (Centro Universitário
+Dom Bosco). The face-ID turnstiles at the campus lots record every car that enters or leaves, so
+the question was simple: how many spaces are free right now? I wrote the backend; a teammate
+wrote a mobile front-end that is not in this repository. The 2024 backend was two FastAPI
+services: a turnstile simulator that wrote Faker data to Parquet files, and a parking API that
+pulled everything from the simulator over HTTP on every request and paired entries with exits in
+pandas.
+
+In 2026 I rebuilt it as a small data system, keeping the UNDB identity and the original idea.
+The two services became one backend and a separate event generator; Parquet became the archive
+instead of the database; and the counts now come from an append-only event log, maintained
+incrementally and pushed to the clients as they change. The events are still simulated: nothing
+here reads real UNDB data. The design is in [docs/REFACTOR_PLAN.md](docs/REFACTOR_PLAN.md) and
+every choice is logged in [docs/DECISIONS.md](docs/DECISIONS.md).
 
 ## Web and mobile
 
@@ -162,25 +150,6 @@ logic.
   The phone talks to the API directly, so expose the API on the LAN (`API_BIND=0.0.0.0`) and
   start Expo with `EXPO_PUBLIC_API_BASE_URL=http://<LAN-IP>:8000 make mobile-start`. The steps,
   including the firewall, are in [docs/running.md](docs/running.md#expo-go-on-a-phone-lan).
-
-## Screenshots
-
-From a local `make demo` run with a 30-day backfill.
-
-![Web, Vagas: each lot with its free spaces, a capacity bar, a free, busy or full status and the time of the last update.](docs/screenshots/web-vagas.png)
-
-![Web, Relatórios: date and lot filters, the warehouse freshness and KPI cards per lot: entries, exits, entries per day, average and P90 stay, turnover, minimum free spaces and minutes full.](docs/screenshots/web-relatorios.png)
-
-![Web, Relatórios charts: daily entries and exits with the 7-day moving average, and the hourly profile of entries, exits and free spaces.](docs/screenshots/web-relatorios-charts.png)
-
-![Web, Operador: ingestion health with arrival lag and accepted, duplicate and rejected events per minute, rejects grouped by reason and the gates with their last event and last received times.](docs/screenshots/web-operador.png)
-
-<table>
-  <tr>
-    <td><img src="docs/screenshots/mobile-vagas.png" width="300" alt="Mobile, Vagas: the live lots with their free spaces and status, in the Expo app."></td>
-    <td><img src="docs/screenshots/mobile-relatorios.png" width="300" alt="Mobile, Relatórios: lot and 7, 30 or 90-day filters, the warehouse freshness and KPI cards per lot, in the Expo app."></td>
-  </tr>
-</table>
 
 ## Backend and generator
 
@@ -200,6 +169,17 @@ The repository holds two Python projects that share nothing but the contract.
 
 A real gate integration would replace the generator and use the same endpoint and ingest key.
 
+## Tech stack
+
+- Backend: Python 3.12 · FastAPI · SQLAlchemy 2 (async) · Alembic · Pydantic · pyarrow ·
+  Prometheus client
+- Data: Postgres 17 · dbt-postgres · Parquet
+- Generator: Python 3.12 · httpx · Pydantic models generated with datamodel-code-generator
+- Clients: TypeScript · React 19 · Vite · React Router · TanStack Query · ECharts · Expo SDK 57
+  (React Native, Expo Router) · openapi-typescript
+- Quality: uv · ruff · mypy · pytest · Hypothesis · ESLint · Vitest · Jest
+- Delivery: Docker Compose · nginx · GitHub Actions · Dependabot · D2
+
 ## Development
 
 Python work needs uv; the JS workspace needs Node 24 (`.nvmrc`). `make help` lists every target.
@@ -209,11 +189,13 @@ make install                  # backend (with the dbt group) and generator envir
 make js-install               # npm ci for apps/web, apps/mobile and packages/api-client
 make lint                     # ruff, mypy, eslint, tsc and the three drift checks (= CI)
 make test                     # pytest with 85% coverage gates, Vitest, Jest, web build, Expo export
-make up-db && make test-integration   # Postgres integration tests (compose postgres)
+make up-db                    # start the compose Postgres, then:
+make test-integration         # Postgres integration tests
 make openapi                  # regenerate backend/openapi.json from the app
 make gen-generator-models     # regenerate the generator's Pydantic models from it
 make api-client               # regenerate packages/api-client/src/schema.ts from it
-make warehouse | make warehouse-full  # dbt build as a recorded run (needs PARKING_DATABASE_URL)
+make warehouse                # incremental dbt build as a recorded run (needs PARKING_DATABASE_URL)
+make warehouse-full           # source freshness and a full-refresh build as a recorded run
 make d2-install               # once: the pinned D2 v0.9.0 (Linux x86_64, sha256 checked)
 make diagrams                 # render docs/diagrams/*.d2 to SVG
 make diagrams-check           # render and fail on any difference (the CI diagrams job)
@@ -223,12 +205,19 @@ make diagrams-watch NAME=architecture  # live preview of one diagram
 On Windows, run the diagram targets in WSL: CI renders with the Linux binary and the committed
 SVGs must match it byte for byte.
 
-CI (`.github/workflows/ci.yml`) runs backend lint and tests, Postgres integration tests, the JS
-checks and builds, generator lint and tests, an end-to-end job (real API on Postgres, a 7-day
-backfill twice, the daily run, an incremental dbt build that must leave the marts unchanged,
-`dbt test`), a compose smoke (`make demo` and `scripts/smoke.py` through nginx) and the diagram
-check. `security.yml` runs pip-audit, npm audit and zizmor. Dependabot proposes monthly minor and
-patch updates.
+CI, in `.github/workflows/ci.yml`:
+
+- backend lint (ruff, mypy, OpenAPI drift) and tests with the coverage gate;
+- backend integration tests against a Postgres service container;
+- the JS workspace: lint, typecheck, tests, web build, Expo export and the client drift check;
+- generator lint (with the models drift check) and tests;
+- end to end: the real API on Postgres, a 7-day backfill twice, the daily run, an incremental dbt
+  build that must leave the marts unchanged, and `dbt test`;
+- compose smoke: `make demo` and `scripts/smoke.py` through nginx;
+- `diagrams`: the committed SVGs must match the D2 sources.
+
+`security.yml` runs pip-audit, npm audit and zizmor. Dependabot proposes monthly minor and patch
+updates.
 
 ## Project structure
 
@@ -249,10 +238,10 @@ compose.yaml  Makefile  .env.example
 
 ## Documentation
 
-- [docs/flow.md](docs/flow.md): the whole flow in one ordered sequence.
+- [docs/flow.md](docs/flow.md): the whole flow in one ordered sequence, with the user-flow diagrams.
+- [docs/data-model.md](docs/data-model.md): tables, models, grains and incremental rules, with the ERDs.
 - [docs/running.md](docs/running.md): running the stack, keys, Expo Go on a phone.
 - [docs/api.md](docs/api.md): the live WebSocket protocol and client rules.
-- [docs/data-model.md](docs/data-model.md): tables, models, grains and incremental rules.
 - [docs/DECISIONS.md](docs/DECISIONS.md): the decision log.
 - [docs/REFACTOR_PLAN.md](docs/REFACTOR_PLAN.md): the rebuild plan.
 - [docs/BRAND.md](docs/BRAND.md): visual identity sources and contrast checks.
