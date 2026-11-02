@@ -48,8 +48,10 @@ jobs:
         with: { persist-credentials: false }
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with: { node-version-file: .nvmrc }
-      # Production dependencies only; the dev tooling never ships.
-      - run: npm audit --omit=dev --audit-level=high
+      # audit-ci runs npm audit on production dependencies (high and critical fail) with the
+      # path-scoped allowlist in audit-ci.jsonc; it is pinned in package-lock.json, so install first.
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npx audit-ci --config audit-ci.jsonc
 
   zizmor:
     name: zizmor (GitHub Actions workflows)

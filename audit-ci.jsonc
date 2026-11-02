@@ -1,0 +1,18 @@
+{
+  "$schema": "https://github.com/IBM/audit-ci/raw/main/docs/schema.json",
+  // The security gate of the npm workspace: a high or critical advisory in a production
+  // dependency fails the npm-audit job (security.yml). Dev tooling never ships.
+  "high": true,
+  "skip-dev": true,
+  "report-type": "summary",
+  // Accepted until the Expo SDK upgrade (docs/DECISIONS.md row 66). Each entry is scoped to one
+  // dependency path, so the same advisory reached through any other package still fails.
+  "allowlist": [
+    // zod 3 inside @expo/cli (the Expo dev server and export CLI, not part of the app bundle);
+    // no patched 3.x release exists and @expo/cli in SDK 57 requires zod 3.
+    "GHSA-mrhx-c7xc-m3w5|@expo/cli>zod",
+    // decode-uri-component 0.2 under query-string 7 in expo-router 57 (deep-link parsing on the
+    // phone); the only patched release, 0.5.1, is ESM-only and cannot be loaded by query-string 7.
+    "GHSA-qr28-fpjm-wq7f|expo-router>query-string>decode-uri-component"
+  ]
+}
