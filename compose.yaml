@@ -1,10 +1,38 @@
 name: undb-campus-parking
 
-# Local development only: the default credentials below are public and must never reach a
-# shared or production database. Override them in .env (see .env.example).
+# Local stack: `make up-db` starts Postgres alone (tests, local dev); `make demo` builds and starts
+# everything. The default Postgres credentials below are public and local only: never reuse them on
+# a shared or production database. API keys come only from .env (`make demo` writes random ones).
+
+x-hardening: &hardening
+  init: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+
+x-env-file: &env-file
+  env_file:
+    - path: .env
+      required: false # so `make up-db` works without one; the backend refuses to start without keys
+
+x-backend: &backend
+  <<: [*hardening, *env-file]
+  image: undb-campus-parking/backend:local
+  build: backend
+  read_only: true
+  tmpfs: [/tmp]
+  # These win over .env, whose values are written for running on the host.
+  environment:
+    # prod: the three API keys are required, must differ and cannot be placeholders.
+    PARKING_ENV: prod
+    PARKING_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-parking}:${POSTGRES_PASSWORD:-parking}@postgres:5432/${POSTGRES_DB:-parking}
+    PARKING_CORS_ORIGINS: '["http://localhost:${WEB_PORT:-8080}"]'
+    PARKING_LAKE_DIR: /data/lake
+    PARKING_DBT_PROJECT_DIR: /app/warehouse
+    PARKING_WORKER_HEARTBEAT_FILE: /tmp/worker-heartbeat
+
 services:
   postgres:
-    image: postgres:17.11-alpine # keep in sync with the service image in .github/workflows/ci.yml
+    image: postgres:17.11-alpine@sha256:266d3c257594e195b309ae9d1805e54c788f1d7b375f56bf6c367aac6c917e7b # keep in sync with ci.yml
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-parking}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-parking}
@@ -20,6 +48,100 @@ services:
       retries: 10
       start_period: 10s
     restart: unless-stopped
+    init: true
+    security_opt: ["no-new-privileges:true"]
+    # The entrypoint runs as root to prepare the data directory, then drops to the postgres user.
+    cap_drop: [ALL]
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, SETGID, SETUID]
+    mem_limit: 512m
+
+  migrate:
+    <<: *backend
+    command: ["migrate"]
+    restart: "no"
+    healthcheck:
+      disable: true
+    mem_limit: 256m
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    <<: *backend
+    ports:
+      # API_BIND=0.0.0.0 exposes the API on the LAN (Expo Go on a phone); see docs/running.md.
+      - "${API_BIND:-127.0.0.1}:${API_PORT:-8000}:8000"
+    restart: unless-stopped
+    mem_limit: 384m
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  worker:
+    <<: *backend
+    command: ["worker"]
+    # The worker gives a running job 25 s to finish on SIGTERM (DECISIONS row 47); Docker's
+    # default 10 s would kill it first and leave the run marked running.
+    stop_grace_period: 30s
+    tmpfs:
+      - /tmp
+      # dbt artefacts; the worker reads run_results.json from here. A tmpfs mount is owned by root
+      # unless its options say otherwise, which hides the image's chown, so hand it to the app user.
+      - /app/warehouse/target:uid=10001,gid=10001,mode=0700
+    volumes:
+      - lake:/data/lake
+    healthcheck:
+      # The worker touches its heartbeat file every few seconds, also during a dbt build.
+      test:
+        - CMD
+        - python
+        - -c
+        - "import os, sys, time; sys.exit(time.time() - os.path.getmtime('/tmp/worker-heartbeat') > 60)"
+      interval: 15s
+      timeout: 3s
+      retries: 4
+      start_period: 20s
+    restart: unless-stopped
+    mem_limit: 1g
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  generator:
+    <<: [*hardening, *env-file]
+    image: undb-campus-parking/generator:local
+    build: generator
+    read_only: true
+    tmpfs: [/tmp]
+    # `run`: bootstrap the registry, then stream live events (no backfill unless
+    # GENERATOR_BACKFILL_DAYS is set; `make demo` backfills as a one-off instead).
+    command: ["run"]
+    environment:
+      GENERATOR_API_URL: http://api:8000
+      GENERATOR_INGEST_API_KEY: ${PARKING_INGEST_API_KEY:-}
+      GENERATOR_ADMIN_API_KEY: ${PARKING_ADMIN_API_KEY:-}
+    restart: unless-stopped
+    mem_limit: 256m
+    depends_on:
+      api:
+        condition: service_healthy
+
+  web:
+    <<: *hardening
+    image: undb-campus-parking/web:local
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    read_only: true
+    tmpfs: [/tmp]
+    ports:
+      - "127.0.0.1:${WEB_PORT:-8080}:8080"
+    restart: unless-stopped
+    mem_limit: 64m
+    depends_on:
+      api:
+        condition: service_healthy
 
 volumes:
   postgres-data:
+  lake:

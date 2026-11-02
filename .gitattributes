@@ -3,6 +3,9 @@ Makefile text eol=lf
 *.sh text eol=lf
 *.d2 text eol=lf
 *.py text eol=lf
+# Read inside Linux containers: a CR would end up in RUN continuations and nginx directives.
+Dockerfile text eol=lf
+*.conf text eol=lf
 # Written with LF by `campus-parking openapi`; make openapi-check compares the bytes.
 backend/openapi.json text eol=lf
 *.parquet binary

@@ -5,7 +5,8 @@ SHELL := bash
 .PHONY: help install lint format test test-fast migrate up-db down test-integration openapi \
 	openapi-check warehouse warehouse-full d2-install diagrams diagrams-check diagrams-watch backend-lint backend-test \
 	generator-install generator-lint generator-test gen-generator-models generator-models-check \
-	js-install js-lint js-test js-build api-client api-client-check web-dev mobile-start
+	js-install js-lint js-test js-build api-client api-client-check web-dev mobile-start \
+	demo-env demo demo-down logs smoke
 
 help: ## list the targets
 	@grep -hE '^[a-zA-Z0-9_-]+:.*## ' $(MAKEFILE_LIST) | sort | \
@@ -161,6 +162,40 @@ up-db: ## start the local Postgres and wait until it is healthy
 
 down: ## stop the local stack and delete its volumes
 	docker compose down -v
+
+# The whole stack in Docker (docs/running.md). Keys are random per checkout and never printed.
+DEMO_BACKFILL_DAYS ?= 90
+
+demo-env: ## create .env from .env.example and add any missing API key (random, never printed)
+	@[ -f .env ] || { cp .env.example .env; chmod 600 .env; echo "created .env from .env.example"; }
+	@for role in INGEST ADMIN OPERATOR; do \
+		grep -q "^PARKING_$${role}_API_KEY=." .env && continue; \
+		echo "PARKING_$${role}_API_KEY=$$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')" >> .env; \
+		echo "added a random PARKING_$${role}_API_KEY to .env"; \
+	done
+
+demo: demo-env ## build and start the stack, backfill DEMO_BACKFILL_DAYS (90) days and build the warehouse
+	@# The worker starts last: its scheduler queues yesterday's daily and a warehouse run at once,
+	@# which would collide with the one-off daily below (same run key, same dbt target). Stopping
+	@# it first keeps a rerun safe. --no-deps: never recreate api under a running nginx.
+	docker compose up -d --build --wait postgres migrate api generator web
+	docker compose stop worker
+	docker compose run --rm --no-deps -T generator backfill --days $(DEMO_BACKFILL_DAYS)
+	docker compose run --rm --no-deps -T worker worker --once daily
+	docker compose up -d --wait worker
+	@echo
+	@echo "web       http://localhost:$${WEB_PORT:-8080}"
+	@echo "API docs  http://localhost:$${API_PORT:-8000}/docs"
+	@echo "operator key: grep PARKING_OPERATOR_API_KEY .env"
+
+demo-down: ## stop the demo stack and delete its volumes (database and Parquet lake)
+	docker compose down -v
+
+logs: ## follow the logs of the whole stack
+	docker compose logs -f
+
+smoke: ## REST and the live WebSocket through nginx on http://localhost:8080 (after make demo)
+	python3 scripts/smoke.py
 
 test-integration: ## pytest -m integration against TEST_DATABASE_URL (run make up-db first)
 	cd backend && uv run pytest -m integration --no-cov -q
