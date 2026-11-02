@@ -9,5 +9,5 @@
 .coverage.*
 htmlcov
 tests
-.env
-.env.*
+**/.env
+**/.env.*
