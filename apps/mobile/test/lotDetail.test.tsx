@@ -1,4 +1,5 @@
 import { act, screen } from '@testing-library/react-native'
+import { useLive } from '../src/parking'
 import { LotDetailScreen } from '../src/screens/LotDetailScreen'
 import type { OccupancySlot } from '../src/types'
 import { FakeSocket, lotA, problem, renderApp, snapshot } from './helpers'
@@ -37,8 +38,14 @@ test('empty curve', async () => {
   expect(await screen.findByText('Sem dados de ocupação para este dia.')).toBeTruthy()
 })
 
+// Mounts the screen only once a live frame is in, as when a deep link opens it while the app is
+// already live: the REST query must then turn itself on because the frame lacks the lot.
+function AfterLiveFrame({ lotId }: { lotId: string }) {
+  return useLive().snapshot ? <LotDetailScreen lotId={lotId} /> : null
+}
+
 test('an id missing from the live snapshot falls back to REST and shows the not-found error', async () => {
-  await renderApp(<LotDetailScreen lotId="Z" />, {
+  const { fetch } = await renderApp(<AfterLiveFrame lotId="Z" />, {
     '/lots/Z/availability': problem(404, 'lot-not-found', 'Lot Z does not exist.'),
     '/reports/occupancy': { body: [] },
   })
@@ -48,6 +55,8 @@ test('an id missing from the live snapshot falls back to REST and shows the not-
     ws.onmessage?.({ data: JSON.stringify(snapshot([lotA])) })
   })
   expect(await screen.findByText('Erro 404: Lot Z does not exist. (id req-1)')).toBeTruthy()
+  const urls = fetch.mock.calls.map(([input]) => String(input instanceof Request ? input.url : input))
+  expect(urls.some((u) => u.endsWith('/api/v1/lots/Z/availability'))).toBe(true)
   expect(screen.queryByLabelText('Estacionamento Principal: 42 vagas livres de 200')).toBeNull()
 })
 
