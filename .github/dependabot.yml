@@ -1,0 +1,116 @@
+# Monthly update PRs, one group per entry for minor and patch (program decision 70). Semver-major
+# version updates are ignored for every dependency and move by hand; the program ignores below
+# hold back more than that where a toolchain pins a version. A release waits 7 days before it is
+# proposed. Security updates skip the schedule and the cooldown.
+# .github/workflows/dependabot-auto-merge.yml merges these PRs once the required checks pass.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    cooldown:
+      default-days: 7
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+    groups:
+      actions:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: uv
+    directory: /backend
+    schedule:
+      interval: monthly
+    cooldown:
+      default-days: 7
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+    groups:
+      backend-python:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: uv
+    directory: /generator
+    schedule:
+      interval: monthly
+    cooldown:
+      default-days: 7
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+    groups:
+      generator-python:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+
+  # One npm workspace (apps/web, apps/mobile, packages/api-client) with one lockfile at the root.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: monthly
+    cooldown:
+      default-days: 7
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+      # openapi-typescript 7 requires TypeScript 5 (docs/DECISIONS.md rows 29 and 65).
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+      # The Expo SDK pins react, react-native and their native modules; they move together with
+      # an SDK upgrade (npx expo install --fix), never one by one.
+      - dependency-name: "expo"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-native"
+      - dependency-name: "react"
+      - dependency-name: "react-dom"
+      - dependency-name: "react-native-*"
+      - dependency-name: "@types/react"
+      - dependency-name: "@types/react-dom"
+      # test-renderer 1.3 brings react-reconciler 0.34, which hoists a second React next to the
+      # pinned 19.2.3 (docs/DECISIONS.md row 65); it moves with the next Expo SDK.
+      - dependency-name: "test-renderer"
+        versions: [">=1.3.0"]
+      - dependency-name: "jest-expo"
+        update-types: ["version-update:semver-major"]
+    groups:
+      npm:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: docker
+    directories: [/backend, /generator]
+    schedule:
+      interval: monthly
+    cooldown:
+      default-days: 7
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+      # The runtime stays on Python 3.12 (refactor baseline): only patch and digest updates.
+      - dependency-name: "python"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+    groups:
+      python-images:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: docker
+    directory: /apps/web
+    schedule:
+      interval: monthly
+    cooldown:
+      default-days: 7
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+      # The Node major moves by hand, to an LTS line only and together with .nvmrc, which CI reads.
+      - dependency-name: "node"
+        update-types: ["version-update:semver-major"]
+    groups:
+      web-images:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]

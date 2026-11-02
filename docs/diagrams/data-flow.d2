@@ -1,0 +1,81 @@
+# Layers from the gate event to the clients, and where contracts, checks and run metadata sit.
+# Grounded in backend/src/campus_parking/ingestion/{contract,validation,service}.py,
+# occupancy/{pairing,service}.py, realtime/poller.py, jobs/{close_day,export,archive_contract,
+# warehouse}.py, reports/service.py, backend/warehouse/models/ and docs/data-model.md.
+...@_style
+
+title: "Data flow: gate event to clients" {
+  shape: text
+  near: top-center
+  style: {font-size: 24; bold: true}
+}
+
+direction: down
+
+src: "Gate events\ngenerator or a real gate\nPOST /api/v1/events" {class: source}
+contract: "ingestion contract\nGateEvent v1, 1 to 1000 items,\nevent_id + payload hash" {class: check}
+
+events: "raw · gate_events\nappend-only (trigger)" {class: store}
+rejects: "raw · ingest_rejects\none reason per item" {class: store}
+batches: "run metadata · ingest_batches\none row per POST" {class: store}
+
+stays: "processed · stays\nre-derived per lot,\nstudent and day" {class: process}
+occupancy: "processed · lot_occupancy\nopen stays + version" {class: store}
+
+archive: "archive · Parquet lake\nraw copy per service_date\n+ _manifest.json (dbt\nreads Postgres, not this)" {class: store}
+archive_check: "archive contract\nschema, unique ids,\nrow count" {class: check}
+
+staging: "warehouse · staging\n7 views, student_ref → md5" {class: process}
+freshness: "source freshness\ngate_events.received_at" {class: check}
+intermediate: "warehouse · intermediate\nint_stays_classified view:\nduration bucket, capacity" {class: process}
+facts:"warehouse · dims, facts\nSCD2 dim_lot,\n3 incremental facts" {class: process}
+marts: "warehouse · 4 marts\ncontracts enforced" {class: store}
+dbt_tests: "dbt tests on the warehouse\nkeys, relationships,\nsingular, unit" {class: check}
+
+runs: "run metadata\npipeline_runs, service_days:\nevery close_day, export\nand dbt run" {class: store}
+
+live: "serving · availability\nREST + WebSocket" {class: serving}
+reports: "serving · reports API\n/reports/*, ETag cache" {class: serving}
+clients: "Web and mobile apps" {class: serving}
+
+src -> contract
+contract -> events: "accepted"
+contract -> rejects: "rejected"
+contract -> batches {class: meta}
+events -> stays: "pairing"
+stays -> occupancy: "Δ open"
+
+events -> archive: "close_day"
+rejects -> archive
+events -> archive_check {class: layer}
+archive_check -> archive {class: meta}
+
+events -> staging
+stays -> staging
+rejects -> staging
+events -> freshness {class: layer}
+freshness -> staging {class: meta}
+staging -> intermediate
+staging -> facts
+intermediate -> facts
+facts -> marts
+facts -> dbt_tests {class: layer}
+dbt_tests -> marts {class: meta}
+
+runs -> reports: "freshness,\ncache key" {class: meta}
+
+occupancy -> live: "poll versions 1 s"
+marts -> reports
+live -> clients
+reports -> clients
+
+legend: Legend {
+  class: legend
+  grid-columns: 4
+  source: source {class: [source; legend-item]}
+  check: contract or test {class: [check; legend-item]}
+  process: process or view {class: [process; legend-item]}
+  store: stored data {class: [store; legend-store]}
+  serving: serving {class: [serving; legend-item]}
+  edges: "solid arrow: data\ndashed: check or\nrun metadata" {shape: text; style.font-size: 13}
+}

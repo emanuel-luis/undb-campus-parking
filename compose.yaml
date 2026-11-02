@@ -16,8 +16,11 @@ x-env-file: &env-file
 
 x-backend: &backend
   <<: [*hardening, *env-file]
+  # One image for migrate, api and worker. Only migrate declares the build: Compose builds through
+  # bake, which refuses two targets writing the same tag. Every backend service depends on migrate,
+  # so `up --build` always builds it first; the others never pull it from a registry.
   image: undb-campus-parking/backend:local
-  build: backend
+  pull_policy: never
   read_only: true
   tmpfs: [/tmp]
   # These win over .env, whose values are written for running on the host.
@@ -57,6 +60,7 @@ services:
 
   migrate:
     <<: *backend
+    build: backend
     command: ["migrate"]
     restart: "no"
     healthcheck:

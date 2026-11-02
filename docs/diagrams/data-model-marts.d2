@@ -1,0 +1,100 @@
+# The four marts in schema warehouse that the reports API reads. Grounded in
+# backend/warehouse/models/marts/mart_*.sql and _marts.yml (contracts enforced: these are the
+# exact columns and types); the two arrows are the marts' dbt relationships tests. dim_date and
+# dim_lot show their keys only; data-model-warehouse.d2 draws them in full.
+...@_style
+
+title: "Data model: marts behind the reports API (dbt)" {
+  shape: text
+  near: top-center
+  style: {font-size: 24; bold: true}
+}
+
+note: "Built from fct_gate_event, fct_stay and fct_occupancy_snapshot; tables rebuilt on every dbt build, contracts enforced.\nDwell figures use closed stays only; turnover = stays with an entry / capacity of the day; lot -1 holds rejects without a registered lot." {
+  shape: text
+  near: bottom-center
+  style.font-size: 15
+}
+
+direction: right
+
+mart_lot_daily: {
+  shape: sql_table
+  lot_id: text {constraint: primary_key}
+  service_date: date {constraint: primary_key}
+  date_key: int {constraint: foreign_key}
+  capacity: int
+  entries: int
+  exits: int
+  unique_students: int
+  entries_ma7: "numeric(10,2)"
+  avg_stay_min: "numeric(10,2)"
+  median_stay_min: "numeric(10,2)"
+  p90_stay_min: "numeric(10,2)"
+  peak_occupied: int
+  peak_slot: text
+  min_free: int
+  minutes_full: "numeric(10,2)"
+  stays: int
+  turnover: "numeric(10,2)"
+  closed_by_reconciliation: int
+  exit_only: int
+  missing_exit: int
+}
+
+mart_lot_hourly: {
+  shape: sql_table
+  lot_id: text {constraint: primary_key}
+  service_date: date {constraint: primary_key}
+  date_key: int
+  hour: int {constraint: primary_key}
+  capacity: int
+  entries: int
+  exits: int
+  avg_free: "numeric(10,2)"
+  avg_occupied: "numeric(10,2)"
+  max_occupied: int
+}
+
+mart_lot_dwell_daily: {
+  shape: sql_table
+  lot_id: text {constraint: primary_key}
+  service_date: date {constraint: primary_key}
+  date_key: int
+  duration_bucket: text {constraint: primary_key}
+  bucket_order: int
+  stays: int
+}
+
+mart_data_quality_daily: {
+  shape: sql_table
+  service_date: date {constraint: primary_key}
+  date_key: int
+  lot_id: text {constraint: [primary_key; foreign_key]}
+  rejects_total: int
+  rejects_schema_invalid: int
+  rejects_unknown_gate: int
+  rejects_unknown_student: int
+  rejects_lot_mismatch: int
+  rejects_direction_mismatch: int
+  rejects_in_future: int
+  rejects_too_old: int
+  rejects_event_id_conflict: int
+  closed_by_reconciliation: int
+  exit_only: int
+  missing_exit: int
+}
+
+dim_date: {
+  shape: sql_table
+  date_key: "int YYYYMMDD" {constraint: primary_key}
+}
+
+dim_lot: {
+  shape: sql_table
+  lot_key: text {constraint: primary_key}
+  lot_id: text
+}
+
+mart_lot_daily.date_key -> dim_date.date_key
+mart_data_quality_daily.lot_id -> dim_lot.lot_id

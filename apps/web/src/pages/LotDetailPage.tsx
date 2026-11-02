@@ -37,7 +37,8 @@ export function freeCurveOption(slots: Slot[], names: Map<string, string>) {
     const cap = new Map(slots.map((s) => [s.slot_key, s.capacity]))
     series.push({ type: 'line', name: 'Capacidade', showSymbol: false, lineStyle: { type: 'dashed' }, data: keys.map((k) => cap.get(k) ?? null) })
   }
-  return { legend: {}, xAxis: { type: 'category', data: keys.map(slotLabel) }, yAxis: { type: 'value', min: 0 }, series }
+  // Legend on top like the other charts: left to ECharts it landed on the x-axis labels.
+  return { legend: { top: 0, type: 'scroll' }, xAxis: { type: 'category', data: keys.map(slotLabel) }, yAxis: { type: 'value', min: 0 }, series }
 }
 
 export function LotDetailPage() {
