@@ -1,0 +1,19 @@
+# Context of apps/web/Dockerfile (the repository root). backend/ and generator/ build from their
+# own folders with their own .dockerignore.
+**/node_modules
+**/dist
+**/coverage
+**/*.tsbuildinfo
+**/.expo
+**/.venv
+**/__pycache__
+.git
+.github
+.claude
+data
+docs
+backend
+generator
+scripts
+**/.env
+**/.env.*
