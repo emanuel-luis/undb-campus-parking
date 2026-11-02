@@ -9,7 +9,7 @@ academic project: it is not affiliated with UNDB and UNDB does not endorse it.
 | Asset | Source | Used for |
 | --- | --- | --- |
 | Color logo, 204x62 PNG | https://undb.edu.br/wp-content/uploads/2024/11/logo.png (`2024-11-logo.png`) | Light backgrounds (operator login) |
-| White logo, 1209x363 PNG | https://undb.edu.br/, media upload of June 2026 (`2026-06-logo-branca.png`; exact file URL to be confirmed) | Dark header (#770131) |
+| White logo, 1209x363 PNG | https://undb.edu.br/wp-content/uploads/2026/06/logo-branca.png (`2026-06-logo-branca.png`) | Dark header (#770131) |
 | Favicon, 192x192 PNG | https://undb.edu.br/wp-content/uploads/2024/11/cropped-favicon-pos-192x192.png (`favicon-192.png`, white grid on #93070C) | Browser tab icon, Expo icon and splash |
 | Color tokens | Elementor kit CSS, https://undb.edu.br/wp-content/uploads/elementor/css/post-8.css (`.elementor-kit-8` global colors) | Design tokens below |
 

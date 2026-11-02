@@ -89,9 +89,9 @@ jobs:
         run: make test-integration
 
   js:
-    name: "js (api-client: lint, typecheck, test, client drift)"
+    name: "js (lint, typecheck, test, web build, Expo export, client drift)"
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -106,8 +106,12 @@ jobs:
         run: npm run lint
       - name: TypeScript
         run: npm run typecheck
-      - name: Vitest with the 85% coverage gate
+      - name: Tests with the coverage gates (Vitest for api-client and web, Jest for mobile)
         run: npm test
+      - name: Build the web app
+        run: npm run build -w apps/web
+      - name: Export the mobile app for the web (Expo)
+        run: npm run export:web -w apps/mobile
       - name: Client drift check (schema.ts against backend/openapi.json)
         run: |
           npm run gen:api -w @undb-campus-parking/api-client
