@@ -14,14 +14,19 @@ const H = 120
 
 /** Entries and the 7-day mean per date, summed over lots (sums of means stay means of sums). */
 export function dailyTotals(rows: LotDailyRow[]): { day: string; entries: number; ma7: number | null }[] {
-  const byDay = new Map<string, { day: string; entries: number; ma7: number | null }>()
+  // The 7-day line is summed across lots only on days where every lot has one: a partial sum would
+  // dip for no reason (the same rule as the web app).
+  const byDay = new Map<string, { day: string; entries: number; ma7: number; partial: boolean }>()
   for (const r of rows) {
-    const d = byDay.get(r.service_date) ?? { day: r.service_date, entries: 0, ma7: null }
+    const d = byDay.get(r.service_date) ?? { day: r.service_date, entries: 0, ma7: 0, partial: false }
     d.entries += r.entries
-    if (r.entries_ma7 !== null) d.ma7 = (d.ma7 ?? 0) + r.entries_ma7
+    if (r.entries_ma7 === null) d.partial = true
+    else d.ma7 += r.entries_ma7
     byDay.set(r.service_date, d)
   }
-  return [...byDay.values()].sort((a, b) => (a.day < b.day ? -1 : 1))
+  return [...byDay.values()]
+    .map(({ day, entries, ma7, partial }) => ({ day, entries, ma7: partial ? null : ma7 }))
+    .sort((a, b) => (a.day < b.day ? -1 : 1))
 }
 
 export function dwellTotals(rows: DwellBucketRow[]): { bucket: string; stays: number }[] {
