@@ -10,10 +10,12 @@ export function LotDetailScreen({ lotId }: { lotId: string }) {
   const client = useClient()
   const live = useLive()
   const now = useNow()
-  const rest = useQuery({ ...parkingQueries.lotAvailability(client, lotId), enabled: live.snapshot === null })
+  const liveLot = live.snapshot?.lots.find((l) => l.lot_id === lotId)
+  // Ask REST when the live snapshot is missing or does not carry this lot (an unknown id, for example).
+  const rest = useQuery({ ...parkingQueries.lotAvailability(client, lotId), enabled: live.snapshot === null || liveLot === undefined })
   // Today is the server's default date (America/Fortaleza).
   const curve = useQuery(parkingQueries.occupancy(client, { lot_id: lotId }))
-  const lot = live.snapshot?.lots.find((l) => l.lot_id === lotId) ?? rest.data
+  const lot = liveLot ?? rest.data
   const slots = curve.data ?? []
   const { min, minutesFull } = curveStats(slots)
 

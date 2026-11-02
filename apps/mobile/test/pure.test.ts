@@ -1,5 +1,5 @@
 import { ProblemError } from '@undb-campus-parking/api-client'
-import { bars, linePath, niceMax, xAt, yScale } from '../src/chartPaths'
+import { bars, isolatedPoints, linePath, niceMax, xAt, yScale } from '../src/chartPaths'
 import { curveStats, dailyTotals, dwellTotals } from '../src/charts'
 import { formatDateTime, formatDec, formatInt, formatMinutes, formatShortDate, localDate, updatedAgo } from '../src/format'
 import { lotStatus } from '../src/status'
@@ -13,6 +13,17 @@ test('status thresholds: full at 0 free or >= 95%, busy from 75%', () => {
   expect(lotStatus(10, 95)).toBe('full')
   expect(lotStatus(0, 10)).toBe('full')
   expect(lotStatus(null, null)).toBe('unknown')
+})
+
+test('isolated points are returned for single values and values between nulls', () => {
+  expect(linePath([5], 300, 100, 10)).toBe('M150 50') // a lone M draws nothing
+  expect(isolatedPoints([5], 300, 100, 10)).toEqual([{ x: 150, y: 50 }])
+  expect(isolatedPoints([0, null, 10, null, 5, 5], 500, 100, 10)).toEqual([
+    { x: 0, y: 100 },
+    { x: 200, y: 0 },
+  ])
+  expect(isolatedPoints([null, null], 300, 100, 10)).toEqual([])
+  expect(isolatedPoints([1, 2, 3], 300, 100, 10)).toEqual([])
 })
 
 test('chart path builders give exact geometry', () => {
