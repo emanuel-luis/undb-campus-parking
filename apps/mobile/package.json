@@ -19,7 +19,7 @@
     "@expo/metro-runtime": "57.0.17",
     "@tanstack/react-query": "5.105.0",
     "@undb-campus-parking/api-client": "0.0.0",
-    "expo": "57.0.31",
+    "expo": "58.0.22",
     "expo-constants": "57.0.22",
     "expo-font": "57.0.4",
     "expo-linking": "57.0.13",
