@@ -1,12 +1,11 @@
 # End-to-end flow
 
 The whole system in one ordered sequence: from a car passing a gate to the number a student sees,
-then the nightly batch that turns the day into reports. The diagrams draw the same steps:
-[data-flow](diagrams/data-flow.d2), [user-flows-gate-event](diagrams/user-flows-gate-event.d2),
-[user-flows-student](diagrams/user-flows-student.d2) and
-[user-flows-daily-run](diagrams/user-flows-daily-run.d2).
+then the nightly batch that turns the day into reports. The events come from the turnstile
+generator, which simulates the campus gates. The diagrams draw the same steps; their D2 sources
+are in [diagrams/](diagrams/). Click a diagram to open it at full size.
 
-![Data flow from the gate event to the clients](diagrams/data-flow.svg)
+![Data flow from the gate event to the clients.](diagrams/data-flow.svg)
 
 ## 0. Setup
 
@@ -16,6 +15,8 @@ then the nightly batch that turns the day into reports. The diagrams draw the sa
    pseudonymous students. Every call is an idempotent upsert.
 
 ## 1. A car passes a gate
+
+![Sequence diagram: a batch of gate events from the generator's POST to the snapshot the apps receive.](diagrams/user-flows-gate-event.svg)
 
 3. A gate (here the generator, which stands in for the face-ID turnstiles) sends
    `POST /api/v1/events` with 1 to 1000 `GateEvent` v1 items and the ingest key. Live mode
@@ -37,6 +38,8 @@ then the nightly batch that turns the day into reports. The diagrams draw the sa
 
 ## 2. The student sees it
 
+![Sequence diagram: the live snapshot on connect, updates, the REST fallback and reconnect, and pause and resume.](diagrams/user-flows-student.svg)
+
 10. Each API process polls the lot versions every second. On a change, a lot appearing or
     disappearing, or every 15 s as a heartbeat, it reads the availability snapshot and sends it
     to every WebSocket client on `/api/v1/live/availability`.
@@ -46,16 +49,19 @@ then the nightly batch that turns the day into reports. The diagrams draw the sa
     the last update.
 12. If the socket closes, or 45 s pass without a message, the client polls
     `GET /api/v1/availability` every 10 s and reconnects with jittered backoff up to 30 s; the
-    polling stops once the socket is open again. A hidden page or a backgrounded app
-    closes the socket and reopens it, with a fresh snapshot, when it returns.
+    polling stops once the socket is open again. A hidden page or a backgrounded app closes the
+    socket and reopens it, with a fresh snapshot, when it returns.
 
 ## 3. Every 15 minutes
 
 13. The worker's scheduler queues `warehouse/incremental` when no warehouse run was requested in
-    the last 15 minutes. The worker claims it, runs `dbt build` (incremental facts, marts, tests)
-    and records the result in `pipeline_runs`.
+    the last 15 minutes. The worker claims it, runs `dbt build` (staging views, the intermediate
+    `int_stays_classified` view, the incremental facts, the marts and their tests) and records
+    the result in `pipeline_runs`.
 
 ## 4. The daily run
+
+![Sequence diagram: the daily run from the scheduler through close_day, the Parquet export and the dbt build to the reports cache.](diagrams/user-flows-daily-run.svg)
 
 14. After 00:30 local time the scheduler queues one `daily` run for yesterday. The worker claims
     it with `FOR UPDATE SKIP LOCKED`.
@@ -66,10 +72,13 @@ then the nightly batch that turns the day into reports. The diagrams draw the sa
 17. It then exports the day's events and rejects to the Parquet lake
     (`raw/gate_events/service_date=.../`, `raw/ingest_rejects/received_date=.../`): each file
     passes the archive contract (schema, unique ids, row count against the source) and is
-    published with a `_manifest.json` through an atomic directory swap.
+    published with a `_manifest.json` through an atomic directory swap. The lake is a raw copy;
+    dbt reads Postgres, not these files.
 18. The last child is `warehouse/full`, which runs even when a day failed: `dbt source
-    freshness` (recorded in the run metrics, never fatal), then `dbt build --full-refresh` from
-    staging to the marts with every test.
+    freshness` (recorded in the run metrics, never fatal), then `dbt build --full-refresh`:
+    staging views over the OLTP tables, the intermediate `int_stays_classified` view (duration
+    bucket and the capacity in force on the stay's date), the dimensions and facts, the marts,
+    and every test.
 19. Every child and the parent end as `succeeded` or `failed` in `pipeline_runs`, with their row
     counts and metrics.
 
