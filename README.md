@@ -12,6 +12,8 @@ Unofficial academic project, not affiliated with or endorsed by UNDB.
 
 ![Web app, daily entries and exits with the 7-day moving average, and the hourly profile of entries and exits.](docs/screenshots/web-relatorios-charts.png)
 
+The Relatórios (reports) page of the web app after a 30-day demo run.
+
 ## What this demonstrates
 
 - **An idempotent ingestion contract.** `POST /api/v1/events` takes batches of 1 to 1000
@@ -90,8 +92,9 @@ then archived and modeled for the reports.
 
 ![Architecture: the apps, the generator and the compose services, and the protocols between them.](docs/diagrams/architecture.svg)
 
-Click a diagram to open it at full size. The D2 sources are in
-[docs/diagrams/](docs/diagrams/).
+Click a diagram to open it at full size. D2 sources:
+[data-flow.d2](docs/diagrams/data-flow.d2), [architecture.d2](docs/diagrams/architecture.d2)
+(all of them are in [docs/diagrams/](docs/diagrams/)).
 
 - The three user flows (a car passing a gate, a student checking a lot, the daily run) are drawn
   next to their steps in [docs/flow.md](docs/flow.md).
