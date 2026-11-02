@@ -1,0 +1,54 @@
+# The system in context: who uses it, the compose services and what each one talks to.
+# Grounded in compose.yaml, apps/web/nginx/, apps/mobile (Expo Go, EXPO_PUBLIC_API_BASE_URL),
+# backend/src/campus_parking/{main,cli}.py, jobs/{worker,warehouse,export}.py,
+# generator/src/turnstile_generator/{bootstrap,backfill,live}.py and docs/running.md.
+# Layer detail is in data-flow.d2, the tables in data-model-oltp.d2 and data-model-warehouse.d2.
+# No compose container: ELK puts nodes outside a container below all of it; the labels say
+# which compose service each box is.
+...@_style
+
+title: "Architecture: campus parking availability in one compose stack" {
+  shape: text
+  near: top-center
+  style: {font-size: 24; bold: true}
+}
+
+direction: down
+
+student: "Student" {class: actor; label.near: outside-top-center}
+operator: "Operator\n(operator key)" {class: actor; label.near: outside-top-center}
+gen: "compose: generator\nturnstile-gen: stands\nin for the face-ID gates" {class: process}
+
+web: "compose: web\nnginx :8080, React SPA;\nproxies /api, WebSocket" {class: serving}
+mobile: "Mobile app\nExpo Go on the LAN\n(API_BIND)" {class: serving}
+
+api: "compose: api\nFastAPI :8000, /api/v1\nREST + WebSocket,\nlive poller, report cache" {class: process}
+migrate: "compose: migrate\none-shot:\nalembic upgrade" {class: process}
+worker: "compose: worker\nscheduler, run queue:\nclose_day, export,\nwarehouse" {class: process}
+dbt: "dbt-postgres\n(worker\nsubprocess)" {class: process}
+
+pg: "compose: postgres 17\npublic: OLTP tables\nwarehouse_staging, warehouse" {class: store}
+lake: "volume lake\nParquet per date\n+ _manifest.json" {class: store}
+
+student -> web
+student -> mobile
+operator -> web: "Operador page"
+web -> api: "REST, WebSocket"
+mobile -> api: "REST, WebSocket"
+gen -> api: "REST: POST /events,\nadmin PUTs (X-API-Key)"
+api -> pg: "SQL"
+migrate -> pg {class: meta}
+worker -> pg: "SQL: runs, close_day"
+worker -> dbt: "dbt build" {class: meta}
+dbt -> pg: "SQL: models, tests"
+worker -> lake: "files"
+
+legend: Legend {
+  class: legend
+  grid-columns: 3
+  actor: actor {class: [actor; legend-actor]}
+  serving: client or proxy {class: [serving; legend-item]}
+  process: process {class: [process; legend-item]}
+  store: stored data {class: [store; legend-store]}
+  edges: "solid arrow: data or a call\ndashed: control or schema" {shape: text; style.font-size: 13}
+}

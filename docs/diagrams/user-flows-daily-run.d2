@@ -1,0 +1,42 @@
+# The daily run: the scheduler queues it, close_day closes and exports each pending date, dbt
+# rebuilds the warehouse and the reports cache follows the new run.
+# Grounded in backend/src/campus_parking/jobs/{scheduler,queue,worker,close_day,export,
+# archive_contract,warehouse}.py, reports/service.py and docs/DECISIONS.md rows 21, 44 to 46,
+# 51, 52 and 55.
+# Labels wrap at about 24 characters: the widest label between two lifelines sets their gap.
+...@_style
+
+flow: "Daily run: close, export, warehouse, reports" {
+  shape: sequence_diagram
+  style: {font-size: 24; bold: true}
+
+  worker: "worker\n(scheduler, claim loop)" {class: process}
+  pg: "Postgres\npipeline_runs, OLTP" {class: store}
+  lake: "Parquet lake" {class: store}
+  dbt: "dbt build\n(subprocess)" {class: process}
+  api: "reports API" {class: process}
+
+  worker -> pg: "after 00:30 local:\nqueue daily for\nyesterday, once"
+  worker -> pg: "claim: FOR UPDATE\nSKIP LOCKED"
+
+  days: "One close_day child per pending date, in date order" {
+    worker -> pg: "open stays become\nclosed_by_reconciliation\nat local midnight"
+    worker -> pg: "service_days row;\nrecount, record drift"
+    worker -> lake: "events and rejects:\ncontract check, then\nParquet + manifest,\natomic swap"
+  }
+
+  worker -> dbt: "warehouse/full child\n(even after a failed day)"
+  dbt -> pg: "source freshness:\nrecorded, never fatal"
+  dbt -> pg: "build --full-refresh:\nstaging to marts,\nwith the tests"
+  dbt -> worker: "run_results.json" {class: meta}
+  worker -> pg: "runs succeeded or\nfailed, with metrics"
+
+  api -> pg: "next request: latest\nsucceeded warehouse run"
+  api -> api: "new run id: cache\nemptied, new ETag"
+}
+
+legend: "solid arrow: call, SQL or files · dashed: result" {
+  shape: text
+  near: bottom-center
+  style.font-size: 14
+}
