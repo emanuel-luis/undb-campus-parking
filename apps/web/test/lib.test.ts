@@ -50,6 +50,28 @@ describe('toCsv', () => {
   })
 })
 
+describe('toCsv formula injection', () => {
+  const cols = [
+    { label: 'Nome', value: (r: { n: string | number }) => r.n },
+  ]
+  const body = (n: string | number) => toCsv(cols, [{ n }]).slice(1).split('\r\n')[1]
+
+  it('neutralizes text that starts with a formula trigger', () => {
+    expect(body('=HYPERLINK("x")')).toBe('"\'=HYPERLINK(""x"")"')
+    expect(body('+1')).toBe("'+1")
+    expect(body('-x')).toBe("'-x")
+    expect(body('@x')).toBe("'@x")
+    expect(body('\tx')).toBe("'\tx")
+    expect(body('Portão')).toBe('Portão')
+  })
+
+  it('keeps negative numbers numeric and the BOM and separator', () => {
+    expect(body(-5.5)).toBe('-5,5')
+    const csv = toCsv([...cols, { label: 'V', value: () => 1 }], [{ n: 'a' }])
+    expect(csv).toBe(`${BOM}Nome;V\r\na;1\r\n`)
+  })
+})
+
 describe('format', () => {
   it('formats in pt-BR and America/Fortaleza', () => {
     expect(fmtNum(1234.56)).toBe('1.234,6')
@@ -118,12 +140,17 @@ const daily = (over: Partial<Parameters<typeof trafficChart>[0][number]>) => ({
 
 describe('report builders', () => {
   it('sums traffic over lots per day, in date order', () => {
-    const spec = trafficChart([daily({ service_date: '2026-10-02' }), daily({}), daily({ lot_id: 'L2', entries_ma7: null })])
+    const spec = trafficChart([daily({ service_date: '2026-10-02' }), daily({}), daily({ lot_id: 'L2' })])
     expect(spec.rows).toEqual([
-      { date: '2026-10-01', entries: 20, exits: 18, ma7: 8 },
+      { date: '2026-10-01', entries: 20, exits: 18, ma7: 16 },
       { date: '2026-10-02', entries: 10, exits: 9, ma7: 8 },
     ])
     expect(spec.summary).toBe('30 entradas em 2 dias, média de 15 por dia.')
+  })
+
+  it('leaves the 7-day line null on a day where any lot has no mean', () => {
+    const spec = trafficChart([daily({}), daily({ lot_id: 'L2', entries_ma7: null }), daily({ service_date: '2026-10-02', lot_id: 'L2', entries_ma7: null })])
+    expect(spec.rows.map((r) => r.ma7)).toEqual([null, null])
   })
 
   it('averages the hourly profile over the days of the range', () => {

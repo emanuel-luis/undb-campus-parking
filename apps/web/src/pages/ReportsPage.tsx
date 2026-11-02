@@ -92,7 +92,7 @@ export function ReportsPage() {
   const weekday = useQuery({ ...parkingQueries.weekday(client, range), enabled: valid })
   const dwell = useQuery({ ...parkingQueries.dwell(client, range), enabled: valid })
   const quality = useQuery({ ...parkingQueries.quality(client, range), enabled: valid })
-  const occupancy = useQuery(parkingQueries.occupancy(client, lot ? { date: day, lot_id: lot } : { date: day }))
+  const occupancy = useQuery({ ...parkingQueries.occupancy(client, lot ? { date: day, lot_id: lot } : { date: day }), enabled: valid })
 
   const names = useMemo(() => new Map((lots.data ?? []).map((l) => [l.lot_id, l.name])), [lots.data])
   const dailyRows = daily.data

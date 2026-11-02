@@ -12,7 +12,8 @@ const decimal = new Intl.NumberFormat('pt-BR', { useGrouping: false, maximumFrac
 
 function cell(v: Cell): string {
   if (v === null || v === undefined) return ''
-  const text = typeof v === 'number' ? decimal.format(v) : v
+  // Text starting with a formula trigger gets a leading apostrophe; numbers are formatted as they are.
+  const text = typeof v === 'number' ? decimal.format(v) : /^[=+\-@\t\r]/.test(v) ? `'${v}` : v
   return /[";\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text
 }
 

@@ -42,14 +42,18 @@ const mean = (vs: (number | null)[]): number | null => {
 /** Entries, exits and the 7-day mean of entries per day, summed over the lots. */
 export function trafficChart(rows: Daily[]): ChartSpec<{ date: string; entries: number; exits: number; ma7: number | null }> {
   const days = new Map<string, { date: string; entries: number; exits: number; ma7: number | null }>()
+  const incomplete = new Set<string>()
   for (const r of rows) {
     const d = days.get(r.service_date) ?? { date: r.service_date, entries: 0, exits: 0, ma7: null }
     d.entries += r.entries
     d.exits += r.exits
-    if (r.entries_ma7 !== null) d.ma7 = round1((d.ma7 ?? 0) + r.entries_ma7)
+    // One lot without a 7-day mean makes the day's sum unknown, not partial.
+    if (r.entries_ma7 === null) incomplete.add(r.service_date)
+    else d.ma7 = round1((d.ma7 ?? 0) + r.entries_ma7)
     days.set(r.service_date, d)
   }
   const out = sortedKeys(days.keys()).map((k) => days.get(k)!)
+  for (const d of out) if (incomplete.has(d.date)) d.ma7 = null
   const total = out.reduce((n, d) => n + d.entries, 0)
   return {
     rows: out,
