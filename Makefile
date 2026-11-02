@@ -5,7 +5,7 @@ SHELL := bash
 .PHONY: help install lint format test test-fast migrate up-db down test-integration openapi \
 	openapi-check warehouse warehouse-full d2-install diagrams diagrams-check diagrams-watch backend-lint backend-test \
 	generator-install generator-lint generator-test gen-generator-models generator-models-check \
-	js-install js-lint js-test api-client api-client-check
+	js-install js-lint js-test js-build api-client api-client-check web-dev mobile-start
 
 help: ## list the targets
 	@grep -hE '^[a-zA-Z0-9_-]+:.*## ' $(MAKEFILE_LIST) | sort | \
@@ -101,7 +101,7 @@ format: ## apply ruff fixes and formatting
 	cd generator && uv run ruff check --fix .
 	cd generator && uv run ruff format .
 
-test: backend-test generator-test js-test ## pytest and vitest with the 85% coverage gate, no Postgres needed (JS needs Node 24)
+test: backend-test generator-test js-test js-build ## every test suite with its coverage gate plus the client builds, no Postgres needed (JS needs Node 24)
 
 # JavaScript: one npm workspace at the repo root (packages/*, apps/*). Needs Node 24 (.nvmrc) and
 # an install first (make js-install).
@@ -113,8 +113,18 @@ js-lint: ## eslint, tsc and the schema.ts drift check (CI js job; Node 24 requir
 	npm run typecheck
 	@$(MAKE) --no-print-directory api-client-check
 
-js-test: ## vitest with the 85% coverage gate (CI js job; Node 24 required)
+js-test: ## vitest (api-client 85%, web 80%) and jest (mobile 80%) coverage gates (CI js job; Node 24 required)
 	npm test
+
+js-build: ## web production build and the mobile Expo web export (CI js job; Node 24 required)
+	npm run build -w apps/web
+	npm run export:web -w apps/mobile
+
+web-dev: ## run the web app with Vite on http://localhost:5173 (proxies /api to http://localhost:8000)
+	npm run dev -w apps/web
+
+mobile-start: ## start Expo for Expo Go; set EXPO_PUBLIC_API_BASE_URL=http://<LAN-IP>:8000 first
+	npm run start -w apps/mobile
 
 api-client: ## regenerate packages/api-client/src/schema.ts from backend/openapi.json
 	npm run gen:api -w @undb-campus-parking/api-client
