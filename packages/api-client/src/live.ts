@@ -59,7 +59,12 @@ export function backoffDelay(attempt: number, random: () => number): number {
  */
 export function createLiveAvailability(options: LiveOptions): LiveAvailability {
   const WS = options.WebSocket ?? (globalThis.WebSocket as unknown as new (url: string) => SocketLike)
-  const doFetch = options.fetch ?? ((...a: Parameters<typeof fetch>) => globalThis.fetch(...a))
+  // Explicit parameters, not Parameters<typeof fetch>: with React Native's global types merged in,
+  // fetch is overloaded and Parameters<> takes the narrower RN overload (no URL), which no longer
+  // matches `typeof fetch`.
+  const doFetch: typeof globalThis.fetch =
+    options.fetch ??
+    ((input: RequestInfo | URL, init?: RequestInit) => globalThis.fetch(input, init))
   const setT = options.setTimeout ?? ((fn: () => void, ms: number) => globalThis.setTimeout(fn, ms))
   const clearT = options.clearTimeout ?? ((h: unknown) => globalThis.clearTimeout(h as number))
   const random = options.random ?? Math.random
