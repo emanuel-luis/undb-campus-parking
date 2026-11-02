@@ -75,8 +75,8 @@ Linux binary and the committed SVGs must match it byte for byte.
 - The UNDB notice stays wherever the brand appears: pt-BR in every app footer and the operator
   login, English in the README ("Unofficial academic project, not affiliated with or endorsed by
   UNDB.").
-- Diagrams change through their `.d2` source, then `make diagrams` (WSL); commit both. No
-  Mermaid. When a table, flow or service changes, update the diagram that draws it: CI only
+- Diagrams change through their `.d2` source, then `make diagrams` (WSL); commit both. D2 is the only
+  diagram format. When a table, flow or service changes, update the diagram that draws it: CI only
   checks that the SVGs match the sources. Edit `.d2` files with an editor or the Edit tool, not
   sed or heredocs (they mangle `\n` inside D2 strings).
 
