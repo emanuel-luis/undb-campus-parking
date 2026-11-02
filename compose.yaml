@@ -80,6 +80,9 @@ services:
   worker:
     <<: *backend
     command: ["worker"]
+    # The worker gives a running job 25 s to finish on SIGTERM (DECISIONS row 47); Docker's
+    # default 10 s would kill it first and leave the run marked running.
+    stop_grace_period: 30s
     tmpfs:
       - /tmp
       # dbt artefacts; the worker reads run_results.json from here. A tmpfs mount is owned by root
