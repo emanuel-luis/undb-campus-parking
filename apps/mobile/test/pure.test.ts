@@ -47,6 +47,10 @@ test('aggregation sums lots per day and per bucket', () => {
     { day: '2026-10-01', entries: 7, ma7: 3 },
     { day: '2026-10-02', entries: 5, ma7: null },
   ])
+  // One lot without a 7-day value makes the summed line null for that day, not a partial sum.
+  expect(dailyTotals([day('A', '2026-10-03', 3, 2), day('B', '2026-10-03', 4, null)])).toEqual([
+    { day: '2026-10-03', entries: 7, ma7: null },
+  ])
   expect(
     dwellTotals([
       { lot_id: 'A', bucket_order: 2, duration_bucket: '30-60m', stays: 1 },
