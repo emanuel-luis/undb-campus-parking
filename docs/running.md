@@ -19,17 +19,18 @@ make demo                         # 90 days of history
 make demo DEMO_BACKFILL_DAYS=7    # faster first run
 ```
 
-`make demo` does four things:
+`make demo` does four things (a rerun repeats them safely):
 
 1. Creates `.env` from `.env.example` when it is missing and adds any missing API key
    (`PARKING_INGEST_API_KEY`, `PARKING_ADMIN_API_KEY`, `PARKING_OPERATOR_API_KEY`), each a fresh
    `secrets.token_urlsafe(32)`. The keys are never printed and `.env` is never committed.
-2. `docker compose up -d --build --wait`: builds the images and waits until every service is
-   healthy. `migrate` applies the migrations and exits; the API starts after it, then the worker,
-   the generator (registry bootstrap, then live events) and the web app.
-3. `docker compose run --rm generator backfill --days N`: posts N past days of events.
-4. `docker compose exec worker campus-parking worker --once daily`: closes yesterday, exports it
-   to the Parquet lake and runs a full warehouse refresh, so the reports have data.
+2. `docker compose up -d --build --wait` for everything but the worker: builds the images and waits
+   until the services are healthy. `migrate` applies the migrations and exits; the API starts
+   after it, then the generator (registry bootstrap, then live events) and the web app.
+3. `docker compose run --rm --no-deps generator backfill --days N`: posts N past days of events.
+4. `docker compose run --rm --no-deps worker worker --once daily`: closes yesterday, exports it
+   to the Parquet lake and runs a full warehouse refresh, so the reports have data. Only then does
+   the long-running worker start, so its scheduler never races this run.
 
 Then check it end to end through nginx, REST and the live WebSocket:
 
@@ -62,11 +63,11 @@ or with placeholder or repeated keys. The generator uses the same ingest and adm
 The mobile app talks to the API directly, so the phone needs to reach the API port on your computer.
 
 1. Put the phone and the computer on the same network (same Wi-Fi, no guest isolation).
-2. Expose the API on the LAN and restart it:
+2. Expose the API on the LAN and recreate it (nginx finds the new container within 10 s):
 
    ```bash
    echo "API_BIND=0.0.0.0" >> .env
-   docker compose up -d api
+   docker compose up -d --no-deps api
    ```
 
 3. Find the computer's LAN address (`ipconfig` on Windows, `ip addr` on Linux, `ipconfig getifaddr en0`
@@ -80,7 +81,7 @@ The mobile app talks to the API directly, so the phone needs to reach the API po
    ```
 
 `API_BIND=0.0.0.0` makes the public routes reachable by anyone on that network. Remove the line
-from `.env` and run `docker compose up -d api` again when you are done.
+from `.env` and run `docker compose up -d --no-deps api` again when you are done.
 
 ## Logs, stop and clean up
 

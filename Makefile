@@ -175,9 +175,14 @@ demo-env: ## create .env from .env.example and add any missing API key (random, 
 	done
 
 demo: demo-env ## build and start the stack, backfill DEMO_BACKFILL_DAYS (90) days and build the warehouse
-	docker compose up -d --build --wait
-	docker compose run --rm -T generator backfill --days $(DEMO_BACKFILL_DAYS)
-	docker compose exec -T worker campus-parking worker --once daily
+	@# The worker starts last: its scheduler queues yesterday's daily and a warehouse run at once,
+	@# which would collide with the one-off daily below (same run key, same dbt target). Stopping
+	@# it first keeps a rerun safe. --no-deps: never recreate api under a running nginx.
+	docker compose up -d --build --wait postgres migrate api generator web
+	docker compose stop worker
+	docker compose run --rm --no-deps -T generator backfill --days $(DEMO_BACKFILL_DAYS)
+	docker compose run --rm --no-deps -T worker worker --once daily
+	docker compose up -d --wait worker
 	@echo
 	@echo "web       http://localhost:$${WEB_PORT:-8080}"
 	@echo "API docs  http://localhost:$${API_PORT:-8000}/docs"
