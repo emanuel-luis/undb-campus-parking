@@ -82,7 +82,9 @@ services:
     command: ["worker"]
     tmpfs:
       - /tmp
-      - /app/warehouse/target # dbt artefacts; the worker reads run_results.json from here
+      # dbt artefacts; the worker reads run_results.json from here. A tmpfs mount is owned by root
+      # unless its options say otherwise, which hides the image's chown, so hand it to the app user.
+      - /app/warehouse/target:uid=10001,gid=10001,mode=0700
     volumes:
       - lake:/data/lake
     healthcheck:
