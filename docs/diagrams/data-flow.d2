@@ -60,6 +60,7 @@ staging -> facts
 intermediate -> facts
 facts -> marts
 facts -> dbt_tests {class: layer}
+dbt_tests -> marts {class: meta}
 
 runs -> reports: "freshness,\ncache key" {class: meta}
 

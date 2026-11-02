@@ -3,7 +3,9 @@
 The whole system in one ordered sequence: from a car passing a gate to the number a student sees,
 then the nightly batch that turns the day into reports. The events come from the turnstile
 generator, which simulates the campus gates. The diagrams draw the same steps; their D2 sources
-are in [diagrams/](diagrams/). Click a diagram to open it at full size.
+are [data-flow.d2](diagrams/data-flow.d2), [user-flows-gate-event.d2](diagrams/user-flows-gate-event.d2),
+[user-flows-student.d2](diagrams/user-flows-student.d2) and
+[user-flows-daily-run.d2](diagrams/user-flows-daily-run.d2). Click a diagram to open it at full size.
 
 ![Data flow from the gate event to the clients.](diagrams/data-flow.svg)
 
