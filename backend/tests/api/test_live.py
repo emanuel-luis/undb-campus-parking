@@ -13,6 +13,7 @@ from starlette.websockets import WebSocketDisconnect
 
 from campus_parking.core.db import Base
 from campus_parking.main import create_app
+from campus_parking.realtime.hub import QUEUE_SIZE
 from tests.conftest import make_settings
 from tests.helpers import ADMIN, GATES, INGEST, REF_A, event
 
@@ -136,7 +137,9 @@ def test_shutdown_closes_with_1001(client: TestClient) -> None:
         ws.receive_json()
         client.portal.call(app.state.hub.close)
         with pytest.raises(WebSocketDisconnect) as err:
-            ws.receive_json()
+            # The poller may have queued a snapshot ahead of the close: those come first.
+            for _ in range(QUEUE_SIZE):
+                ws.receive_json()
         assert err.value.code == 1001
     with connect(client) as late, pytest.raises(WebSocketDisconnect) as err:
         late.receive_json()
