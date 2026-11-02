@@ -23,11 +23,13 @@ const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1, sta
 void SplashScreen.preventAutoHideAsync()
 
 export default function RootLayout() {
-  const [loaded] = useFonts({ Montserrat_600SemiBold, Montserrat_700Bold, Roboto_400Regular, Roboto_500Medium })
+  const [loaded, fontError] = useFonts({ Montserrat_600SemiBold, Montserrat_700Bold, Roboto_400Regular, Roboto_500Medium })
+  // On a font error the app still starts, with system fonts.
+  const ready = loaded || fontError !== null
   useEffect(() => {
-    if (loaded) void SplashScreen.hideAsync()
-  }, [loaded])
-  if (!loaded) return null
+    if (ready) void SplashScreen.hideAsync()
+  }, [ready])
+  if (!ready) return null
   if (client === null) return <MissingConfigScreen />
   return (
     <QueryClientProvider client={queryClient}>

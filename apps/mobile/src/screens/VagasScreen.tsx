@@ -21,9 +21,7 @@ export function VagasScreen() {
     <Screen refreshing={rest.isRefetching} onRefresh={() => void rest.refetch()}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
         <StatusChip status={live.status} />
-        <T variant="muted" accessibilityLiveRegion="polite">
-          {updatedAgo(lastUpdate, now)}
-        </T>
+        <T variant="muted">{updatedAgo(lastUpdate, now)}</T>
       </View>
       {snapshot === undefined ? (
         rest.isError ? (

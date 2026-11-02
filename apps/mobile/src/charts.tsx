@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { StyleSheet, View } from 'react-native'
-import Svg, { Line, Path, Rect } from 'react-native-svg'
-import { bars, linePath, niceMax, yScale } from './chartPaths'
+import Svg, { Circle, Line, Path, Rect } from 'react-native-svg'
+import { bars, isolatedPoints, linePath, niceMax, yScale } from './chartPaths'
 import { formatInt, formatShortDate, formatTime } from './format'
 import type { DwellBucketRow, LotDailyRow, OccupancySlot } from './types'
 import { colors } from './theme'
@@ -76,6 +76,9 @@ export function FreeCurve({ slots, name }: { slots: OccupancySlot[]; name: strin
     >
       <Line x1={0} x2={W} y1={capY} y2={capY} stroke={colors.muted} strokeDasharray="4 4" strokeWidth={1} />
       <Path d={linePath(slots.map((x) => x.free_min), W, H, max)} stroke={colors.primary} strokeWidth={2} fill="none" />
+      {isolatedPoints(slots.map((x) => x.free_min), W, H, max).map((p, i) => (
+        <Circle key={i} cx={p.x} cy={p.y} r={3} fill={colors.primary} />
+      ))}
     </Frame>
   )
 }
@@ -97,6 +100,9 @@ export function DailyChart({ rows }: { rows: LotDailyRow[] }) {
         <Rect key={i} x={b.x} y={b.y} width={b.w} height={b.h} fill={colors.primary} opacity={0.35} />
       ))}
       <Path d={linePath(days.map((d) => d.ma7), W, H, max)} stroke={colors.primaryStrong} strokeWidth={2} fill="none" />
+      {isolatedPoints(days.map((d) => d.ma7), W, H, max).map((p, i) => (
+        <Circle key={i} cx={p.x} cy={p.y} r={3} fill={colors.primaryStrong} />
+      ))}
     </Frame>
   )
 }

@@ -1,7 +1,7 @@
-import { screen } from '@testing-library/react-native'
+import { act, screen } from '@testing-library/react-native'
 import { LotDetailScreen } from '../src/screens/LotDetailScreen'
 import type { OccupancySlot } from '../src/types'
-import { lotA, problem, renderApp } from './helpers'
+import { FakeSocket, lotA, problem, renderApp, snapshot } from './helpers'
 
 const slot = (k: number, free: number, secondsFull = 0): OccupancySlot => ({
   lot_id: 'A',
@@ -35,6 +35,20 @@ test('empty curve', async () => {
     '/reports/occupancy': { body: [] },
   })
   expect(await screen.findByText('Sem dados de ocupação para este dia.')).toBeTruthy()
+})
+
+test('an id missing from the live snapshot falls back to REST and shows the not-found error', async () => {
+  await renderApp(<LotDetailScreen lotId="Z" />, {
+    '/lots/Z/availability': problem(404, 'lot-not-found', 'Lot Z does not exist.'),
+    '/reports/occupancy': { body: [] },
+  })
+  await act(async () => {
+    const ws = FakeSocket.last()
+    ws.onopen?.({})
+    ws.onmessage?.({ data: JSON.stringify(snapshot([lotA])) })
+  })
+  expect(await screen.findByText('Erro 404: Lot Z does not exist. (id req-1)')).toBeTruthy()
+  expect(screen.queryByLabelText('Estacionamento Principal: 42 vagas livres de 200')).toBeNull()
 })
 
 test('lot and curve errors', async () => {

@@ -27,6 +27,17 @@ export function linePath(values: (number | null)[], width: number, height: numbe
   return path
 }
 
+/** Points with no neighbour on either side: a path draws nothing for them, so they get a dot. */
+export function isolatedPoints(values: (number | null)[], width: number, height: number, max: number): { x: number; y: number }[] {
+  const out: { x: number; y: number }[] = []
+  values.forEach((v, i) => {
+    if (v !== null && values[i - 1] == null && values[i + 1] == null) {
+      out.push({ x: xAt(i, values.length, width), y: yScale(v, max, height) })
+    }
+  })
+  return out
+}
+
 export interface Bar {
   x: number
   y: number
