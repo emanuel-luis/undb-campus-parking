@@ -1,0 +1,35 @@
+{
+  "expo": {
+    "name": "Vagas UNDB",
+    "slug": "undb-campus-parking",
+    "scheme": "undb-campus-parking",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/favicon-192.png",
+    "userInterfaceStyle": "light",
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/favicon-192.png",
+        "backgroundColor": "#770131"
+      }
+    },
+    "web": {
+      "favicon": "./assets/favicon-192.png",
+      "output": "single"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      "expo-status-bar",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/favicon-192.png",
+          "imageWidth": 120,
+          "resizeMode": "contain",
+          "backgroundColor": "#770131"
+        }
+      ]
+    ]
+  }
+}
