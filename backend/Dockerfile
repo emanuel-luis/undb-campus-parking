@@ -42,7 +42,6 @@ ENV PATH=/app/.venv/bin:$PATH \
     DBT_LOG_PATH=/tmp/dbt-logs \
     DBT_SEND_ANONYMOUS_USAGE_STATS=false
 USER 10001:10001
-VOLUME ["/data/lake"]
 EXPOSE 8000
 # The API's liveness; compose replaces it for the worker (heartbeat file age) and the migrate job.
 HEALTHCHECK --interval=10s --timeout=3s --start-period=20s --retries=5 \
