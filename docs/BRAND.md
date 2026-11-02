@@ -24,8 +24,8 @@ AA needs 4.5 for normal text and 3 for large text and graphics.
 
 | Token | Value | Kit origin | Use | Contrast |
 | --- | --- | --- | --- | --- |
-| primary | #CF004E | primary | Buttons, focus ring, links on light tint | White text on it 5.58; on white 5.58 |
-| primary-strong | #770131 | global color | Header background | White text on it 11.46 |
+| primary | #CF004E | primary | Buttons, focus ring | White text on it 5.58; on white 5.58 |
+| primary-strong | #770131 | global color | Header background, links | White text on it 11.46 |
 | primary-tint | #FCE8EF | derived (light tint of primary) | Info banners | Ink 16.06, primary-strong 9.78, muted 6.03 |
 | purple | #7A1F5C | global color | Second chart series | White text on it 9.64 |
 | ink | #1B0D17 | derived | Body text | 18.81 on white, 16.84 on surface-alt |
@@ -68,7 +68,7 @@ Every screen footer and the operator login screen show, in pt-BR:
 
 > Projeto acadêmico não oficial, sem vínculo com a UNDB nem endosso dela.
 
-The README carries the same notice in English.
+The README will carry the same notice in English when it is added.
 
 ## Mobile
 
