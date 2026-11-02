@@ -1,0 +1,45 @@
+# A student checks a lot: REST and WebSocket, reconnect and the REST fallback.
+# Grounded in packages/api-client/src/live.ts (createLiveAvailability) and react.ts,
+# apps/web/src/components/live.tsx, apps/mobile/app/_layout.tsx, backend/src/campus_parking/
+# realtime/{router,hub,poller}.py, docs/api.md and docs/DECISIONS.md rows 16, 17, 57 and 64.
+# Labels wrap at about 24 characters: the widest label between two lifelines sets their gap.
+...@_style
+
+flow: "A student checks a lot: live snapshot, reconnect, fallback" {
+  shape: sequence_diagram
+  style: {font-size: 24; bold: true}
+
+  student: "student" {class: actor}
+  app: "web or\nmobile app" {class: serving}
+  live: "live client\n(api-client)" {class: process}
+  api: "API\n/api/v1" {class: process}
+
+  student -> app: "opens Vagas"
+  app -> live: "one subscription\nfor the tab or app"
+  live -> api: "open WebSocket\n/live/availability"
+  api -> live: "snapshot on connect" {class: meta}
+  live -> app: "lots: free, capacity,\noccupancy, version\n(highest kept per lot)"
+  app -> student: "free spaces, status,\nlast update" {class: meta}
+
+  open: "While the socket is open" {
+    api -> live: "snapshot when a version\nchanges, else every 15 s" {class: meta}
+  }
+
+  down: "Socket closed, or 45 s without a message" {
+    live -> api: "GET /availability now,\nthen every 10 s"
+    api -> live: "AvailabilitySnapshot" {class: meta}
+    live -> api: "reconnect: random\ndelay up to 1 s × 2^n,\ncapped at 30 s"
+    api -> live: "snapshot: polling stops" {class: meta}
+  }
+
+  hidden: "Page hidden or app in the background" {
+    app -> live: "pause(): socket closed"
+    app -> live: "resume(): reopen,\nfresh snapshot"
+  }
+}
+
+legend: "solid arrow: request or call · dashed: response or push" {
+  shape: text
+  near: bottom-center
+  style.font-size: 14
+}

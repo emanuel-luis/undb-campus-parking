@@ -1,0 +1,137 @@
+# The dbt star schema in schema warehouse. Grounded in backend/warehouse/models/marts/*.sql and
+# _dimensions.yml and _facts.yml: every arrow is a dbt relationships test. The marts are in
+# data-model-marts.d2.
+# Staging views (warehouse_staging) are left out: they mirror the OLTP tables.
+...@_style
+
+title: "Data model: warehouse dimensions and facts (dbt)" {
+  shape: text
+  near: top-center
+  style: {font-size: 24; bold: true}
+}
+
+note: "student_ref never leaves staging: student_key = md5(student_ref). dim_lot is SCD2 on capacity; facts take the version in force on the service date, -1 is the unknown lot.\nFacts are incremental (delete+insert). The marts built from these facts are in data-model-marts." {
+  shape: text
+  near: bottom-center
+  style.font-size: 15
+}
+
+direction: right
+
+dim_date: {
+  shape: sql_table
+  date_key: "int YYYYMMDD" {constraint: primary_key}
+  date_day: date
+  year: int
+  month: int
+  day_of_month: int
+  iso_day_of_week: int
+  weekday_name: text
+  is_weekend: boolean
+  is_holiday: boolean
+  holiday_name: text
+}
+
+dim_time: {
+  shape: sql_table
+  slot_key: "int 0..95" {constraint: primary_key}
+  slot_start: time
+  hour: int
+  minute: int
+  slot_label: text
+}
+
+dim_lot: {
+  shape: sql_table
+  lot_key: "md5(lot_id, valid_from)" {constraint: primary_key}
+  lot_id: text
+  lot_name: text
+  capacity: int
+  valid_from: date
+  valid_to: date
+  is_current: boolean
+}
+
+dim_gate: {
+  shape: sql_table
+  gate_key: "md5(gate_id)" {constraint: primary_key}
+  gate_id: text
+  lot_id: text
+  "direction": text
+  gate_name: text
+}
+
+dim_student: {
+  shape: sql_table
+  student_key: "md5(student_ref)" {constraint: primary_key}
+  first_seen_at: timestamptz
+  last_seen_at: timestamptz
+}
+
+fct_gate_event: {
+  shape: sql_table
+  event_id: uuid {constraint: primary_key}
+  service_date: date
+  date_key: int {constraint: foreign_key}
+  slot_key: int {constraint: foreign_key}
+  hour: int
+  lot_id: text
+  lot_key: text {constraint: foreign_key}
+  gate_id: text
+  gate_key: text {constraint: foreign_key}
+  student_key: text {constraint: foreign_key}
+  "direction": text
+  occurred_at: timestamptz
+  received_at: timestamptz
+}
+
+fct_stay: {
+  shape: sql_table
+  stay_id: uuid {constraint: primary_key}
+  lot_id: text
+  lot_key: text {constraint: foreign_key}
+  service_date: date
+  date_key: int {constraint: foreign_key}
+  student_key: text {constraint: foreign_key}
+  status: text
+  entered_at: timestamptz
+  exited_at: timestamptz
+  ended_at: timestamptz
+  duration_s: int
+  duration_bucket: text
+  has_entry: boolean
+  has_exit: boolean
+  is_closed_by_reconciliation: boolean
+  capacity: int
+  updated_at: timestamptz
+}
+
+fct_occupancy_snapshot: {
+  shape: sql_table
+  lot_id: text {constraint: primary_key}
+  lot_key: text {constraint: foreign_key}
+  service_date: date {constraint: primary_key}
+  date_key: int {constraint: foreign_key}
+  slot_key: int {constraint: [primary_key; foreign_key]}
+  slot_start: timestamptz
+  occupied_end: int
+  occupied_max: int
+  occupied_avg: "numeric(10,2)"
+  capacity: int
+  free_end: int
+  free_min: int
+  seconds_full: int
+  built_at: timestamptz
+}
+
+fct_gate_event.date_key -> dim_date.date_key
+fct_gate_event.slot_key -> dim_time.slot_key
+fct_gate_event.lot_key -> dim_lot.lot_key
+fct_gate_event.gate_key -> dim_gate.gate_key
+fct_gate_event.student_key -> dim_student.student_key
+fct_stay.date_key -> dim_date.date_key
+fct_stay.lot_key -> dim_lot.lot_key
+fct_stay.student_key -> dim_student.student_key
+fct_occupancy_snapshot.date_key -> dim_date.date_key
+fct_occupancy_snapshot.slot_key -> dim_time.slot_key
+fct_occupancy_snapshot.lot_key -> dim_lot.lot_key

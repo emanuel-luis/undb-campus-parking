@@ -1,0 +1,157 @@
+# The OLTP tables in schema public, owned by Alembic. Grounded in
+# backend/alembic/versions/0001_registry.py, 0002_ingestion_occupancy.py and 0003_jobs.py: every
+# arrow is a declared foreign key. Times are timestamptz in UTC; service_date is the local date in
+# PARKING_TIMEZONE. stays has no foreign keys: it is re-derived from gate_events.
+...@_style
+
+title: "Data model: OLTP tables (schema public)" {
+  shape: text
+  near: top-center
+  style: {font-size: 24; bold: true}
+}
+
+note: "gate_events is append-only (a trigger blocks UPDATE and DELETE). stays: one row per stay, stay_id = entry or exit event id, re-derived per (lot, student, service day).\npipeline_runs.parent_run_id → pipeline_runs.run_id (a daily run's children); one queued or running run per (job, service_date)." {
+  shape: text
+  near: bottom-center
+  style.font-size: 15
+}
+
+direction: right
+
+lots: {
+  shape: sql_table
+  lot_id: text {constraint: primary_key}
+  name: text
+  created_at: timestamptz
+  updated_at: timestamptz
+}
+
+lot_capacity_history: {
+  shape: sql_table
+  lot_id: text {constraint: [primary_key; foreign_key]}
+  valid_from: date {constraint: primary_key}
+  capacity: "int > 0"
+}
+
+gates: {
+  shape: sql_table
+  gate_id: text {constraint: primary_key}
+  lot_id: text {constraint: foreign_key}
+  "direction": "entry | exit"
+  name: text
+  last_event_at: timestamptz
+  last_received_at: timestamptz
+  created_at: timestamptz
+  updated_at: timestamptz
+}
+
+students: {
+  shape: sql_table
+  student_ref: "stu_ + 12 hex" {constraint: primary_key}
+  created_at: timestamptz
+  updated_at: timestamptz
+}
+
+ingest_batches: {
+  shape: sql_table
+  batch_id: uuid {constraint: primary_key}
+  received_at: timestamptz
+  items: int
+  accepted: int
+  duplicates: int
+  rejected: int
+  avg_lag_s: float
+  max_lag_s: float
+  duration_ms: int
+}
+
+gate_events: {
+  shape: sql_table
+  event_id: uuid {constraint: primary_key}
+  schema_version: int
+  gate_id: text {constraint: foreign_key}
+  lot_id: text {constraint: foreign_key}
+  "direction": text
+  student_ref: text {constraint: foreign_key}
+  occurred_at: timestamptz
+  service_date: date
+  received_at: timestamptz
+  batch_id: uuid {constraint: foreign_key}
+  payload_sha256: text
+}
+
+ingest_rejects: {
+  shape: sql_table
+  reject_id: bigint {constraint: primary_key}
+  batch_id: uuid {constraint: foreign_key}
+  received_at: timestamptz
+  event_id: uuid
+  service_date: date
+  lot_id: text
+  gate_id: text
+  reason: "text (8 values)"
+  detail: text
+  payload: jsonb
+}
+
+stays: {
+  shape: sql_table
+  stay_id: uuid {constraint: primary_key}
+  lot_id: text
+  student_ref: text
+  service_date: date
+  entry_event_id: uuid {constraint: unique}
+  exit_event_id: uuid {constraint: unique}
+  entered_at: timestamptz
+  exited_at: timestamptz
+  ended_at: timestamptz
+  status: "text (5 values)"
+  duration_s: int
+  updated_at: timestamptz
+}
+
+lot_occupancy: {
+  shape: sql_table
+  lot_id: text {constraint: [primary_key; foreign_key]}
+  occupied: "int >= 0"
+  version: bigint
+  updated_at: timestamptz
+  last_event_at: timestamptz
+}
+
+pipeline_runs: {
+  shape: sql_table
+  run_id: uuid {constraint: primary_key}
+  parent_run_id: uuid {constraint: foreign_key}
+  job: "daily | close_day | warehouse"
+  mode: text
+  trigger: text
+  service_date: date
+  status: text
+  requested_at: timestamptz
+  started_at: timestamptz
+  finished_at: timestamptz
+  rows_read: int
+  rows_written: int
+  rows_rejected: int
+  metrics: jsonb
+  error: text
+}
+
+service_days: {
+  shape: sql_table
+  service_date: date {constraint: primary_key}
+  closed_at: timestamptz
+  run_id: uuid {constraint: foreign_key}
+  exported_events: int
+}
+
+lot_capacity_history.lot_id -> lots.lot_id
+gates.lot_id -> lots.lot_id
+lot_occupancy.lot_id -> lots.lot_id
+gate_events.gate_id -> gates.gate_id
+gate_events.lot_id -> lots.lot_id
+gate_events.student_ref -> students.student_ref
+gate_events.batch_id -> ingest_batches.batch_id
+ingest_rejects.batch_id -> ingest_batches.batch_id
+service_days.run_id -> pipeline_runs.run_id

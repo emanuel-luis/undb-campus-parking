@@ -1,0 +1,43 @@
+# A car passes a gate: the event reaches the API, changes the lot counter and the apps see it.
+# Grounded in generator/src/turnstile_generator/sender.py, backend/src/campus_parking/ingestion/
+# {router,service,validation}.py, occupancy/{pairing,service}.py, realtime/{poller,hub}.py and
+# docs/DECISIONS.md rows 10 to 17 and 33.
+# Labels wrap at about 24 characters: the widest label between two lifelines sets their gap.
+...@_style
+
+flow: "A car passes a gate: event to live availability" {
+  shape: sequence_diagram
+  style: {font-size: 24; bold: true}
+
+  gen: "generator\n(the gates)" {class: process}
+  api: "API\nPOST /events" {class: process}
+  pg: "Postgres\n(OLTP)" {class: store}
+  poller: "live poller\n(each API process)" {class: process}
+  apps: "web and\nmobile apps" {class: serving}
+
+  gen -> api: "1 to 1000 GateEvent\nitems, X-API-Key\n(ingest key)"
+  api -> api: "a free slot of 4\nper process?"
+
+  busy: "Busy, draining or database down" {
+    api -> gen: "429 or 503 with\nRetry-After: the\ngenerator backs off" {class: meta}
+  }
+
+  api -> pg: "load the gates and\nstudents referenced"
+  api -> api: "validate each item:\nschema, unknown gate\nor student, mismatch,\nin_future, too_old"
+  api -> pg: "lock the touched lots\n(ordered, 2 s timeout)"
+  api -> pg: "INSERT gate_events\nON CONFLICT DO\nNOTHING: same hash\nis a duplicate"
+  api -> pg: "re-derive the stays of\neach lot, student, day"
+  api -> pg: "lot_occupancy:\noccupied + Δ open,\nversion + 1"
+  api -> pg: "gates.last_*, rejects,\ningest_batches; commit"
+  api -> gen: "202: accepted,\nduplicates, rejected\nwith reasons" {class: meta}
+
+  poller -> pg: "every second:\nlot versions"
+  poller -> pg: "version changed:\nread the snapshot"
+  poller -> apps: "full snapshot over\nthe WebSocket"
+}
+
+legend: "solid arrow: request, call or SQL · dashed: response" {
+  shape: text
+  near: bottom-center
+  style.font-size: 14
+}
