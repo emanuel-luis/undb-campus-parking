@@ -253,3 +253,34 @@ jobs:
       - name: API log on failure
         if: failure()
         run: tail -n 100 "$RUNNER_TEMP/api.log" || true
+
+  compose-smoke:
+    name: compose smoke (images, make demo, nginx)
+    needs: [backend-lint, generator-lint]
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        shell: bash
+    env:
+      DEMO_BACKFILL_DAYS: "7"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Random API keys in .env, masked in the logs
+        run: |
+          make demo-env
+          grep -E '^PARKING_[A-Z]+_API_KEY=' .env | cut -d= -f2- | sed 's/^/::add-mask::/'
+      - name: Build the images, start the stack, backfill and build the warehouse (make demo)
+        run: make demo
+      - name: REST and the live WebSocket through nginx
+        run: python3 scripts/smoke.py
+      - name: Container state and logs on failure
+        if: failure()
+        run: |
+          docker compose ps -a
+          docker compose logs --no-color --tail 200
+      - name: Stop the stack and delete its volumes
+        if: always()
+        run: docker compose down -v
