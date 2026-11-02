@@ -70,6 +70,10 @@ updates:
       - dependency-name: "react-native-*"
       - dependency-name: "@types/react"
       - dependency-name: "@types/react-dom"
+      # test-renderer 1.3 brings react-reconciler 0.34, which hoists a second React next to the
+      # pinned 19.2.3 (docs/DECISIONS.md row 65); it moves with the next Expo SDK.
+      - dependency-name: "test-renderer"
+        versions: [">=1.3.0"]
       - dependency-name: "jest-expo"
         update-types: ["version-update:semver-major"]
     groups:
