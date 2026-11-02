@@ -36,7 +36,12 @@ const MAX_CACHED_REPORTS = 32
  */
 export function createParkingClient(options: ParkingClientOptions) {
   const baseUrl = options.baseUrl.replace(/\/+$/, '')
-  const doFetch = options.fetch ?? ((...args: Parameters<typeof fetch>) => globalThis.fetch(...args))
+  // Explicit parameters, not Parameters<typeof fetch>: with React Native's global types merged in,
+  // fetch is overloaded and Parameters<> takes the narrower RN overload (no URL), which no longer
+  // matches `typeof fetch`.
+  const doFetch: typeof globalThis.fetch =
+    options.fetch ??
+    ((input: RequestInfo | URL, init?: RequestInit) => globalThis.fetch(input, init))
   const raw = createClient<paths>({ baseUrl, fetch: doFetch })
   // Last 200 body per report URL, at most MAX_CACHED_REPORTS (oldest dropped). A browser
   // revalidates through its HTTP cache and never shows a 304 to script; a runtime without one
