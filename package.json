@@ -17,8 +17,8 @@
     "gen:api": "npm run gen:api --workspaces --if-present"
   },
   "overrides": {
-    "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
   },
   "devDependencies": {
     "audit-ci": "7.1.0"
