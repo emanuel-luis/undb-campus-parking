@@ -1,7 +1,7 @@
 import type { ParkingClient } from '@undb-campus-parking/api-client'
 import { useLiveAvailability } from '@undb-campus-parking/api-client/react'
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
-import { AppState, type AppStateStatus } from 'react-native'
+import { AppState } from 'react-native'
 
 type Live = ReturnType<typeof useLiveAvailability>
 
@@ -10,7 +10,8 @@ const LiveContext = createContext<Live | null>(null)
 
 /** False while the app is in the background, so the live socket closes and reopens on return. */
 export function useAppActive(): boolean {
-  const [state, setState] = useState<AppStateStatus>(AppState.currentState)
+  // React Native types currentState as string | null | undefined; only 'background' closes the socket.
+  const [state, setState] = useState(AppState.currentState)
   useEffect(() => {
     const sub = AppState.addEventListener('change', setState)
     return () => sub.remove()

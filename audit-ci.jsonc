@@ -5,24 +5,9 @@
   "high": true,
   "skip-dev": true,
   "report-type": "summary",
-  // Accepted until the Expo SDK upgrade (docs/DECISIONS.md row 66). Each entry is scoped to one
-  // dependency path as `npm ci` lays out package-lock.json, so the same advisory reached through
-  // any other package still fails. The expiry makes the job fail again on that date, so the
-  // exception is reviewed even if the SDK upgrade slips.
-  "allowlist": [
-    {
-      "GHSA-mrhx-c7xc-m3w5|expo>@expo/cli>zod": {
-        "active": true,
-        "expiry": "2027-03-01",
-        "notes": "zod 3 inside @expo/cli (Expo dev server and export CLI, not in the app bundle); no patched 3.x release and @expo/cli 57 requires zod 3"
-      }
-    },
-    {
-      "GHSA-qr28-fpjm-wq7f|expo-router>query-string>decode-uri-component": {
-        "active": true,
-        "expiry": "2027-03-01",
-        "notes": "decode-uri-component 0.2 under query-string 7 in expo-router 57 (deep-link parsing); the only patched release, 0.5.1, is ESM-only and query-string 7 loads it with require"
-      }
-    }
-  ]
+  // No accepted advisories (docs/DECISIONS.md rows 66 and 74). An exception, when one is needed,
+  // is scoped to one dependency path as `npm ci` lays out package-lock.json ("GHSA-...|a>b>c"),
+  // so the same advisory reached through any other package still fails, and it carries an
+  // expiry so the job fails again and the exception is reviewed.
+  "allowlist": []
 }

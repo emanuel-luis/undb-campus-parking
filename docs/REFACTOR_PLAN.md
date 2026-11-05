@@ -16,7 +16,7 @@ contract: when code and plan disagree, fix one of them in the same PR.
   registry through admin endpoints, then posts events through `POST /api/v1/events`.
 - **Clients** (npm workspaces): `packages/api-client` (types generated from `backend/openapi.json`,
   `openapi-fetch` client, live socket helper), `apps/web` (React + Vite + TS), `apps/mobile`
-  (Expo SDK 57 + TS, runs in Expo Go). UNDB visual identity (see `docs/BRAND.md`).
+  (Expo SDK 58 + TS, runs in Expo Go). UNDB visual identity (see `docs/BRAND.md`).
 - **Warehouse** (`backend/warehouse/`, dbt-postgres): star schema in schema `warehouse` of the same
   Postgres; the reports API reads only from there.
 
@@ -371,5 +371,5 @@ Each PR leaves CI green and gets a fresh-context `reviewer` before merge.
 - Backfill time over HTTP depends on the cost of a 1000-item batch; the PR 7 e2e times a 7-day
   load.
 - `make demo` must generate random local API keys; nothing secret is committed.
-- Expo Go runs only the latest store SDK; both apps pin the React version Expo SDK 57 requires.
+- Expo Go runs only the latest store SDK; both apps pin the React version Expo SDK 58 requires.
 - WebSocket through nginx needs the upgrade headers; the compose smoke tests the socket.

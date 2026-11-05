@@ -149,7 +149,7 @@ logic.
   Relatórios (KPI cards, daily and hourly charts, weekday comparison, dwell time, data quality,
   CSV download) and Operador (ingestion health, rejects by reason, gates, run history; asks for
   the operator key). Served by nginx in `make demo`; `make web-dev` runs Vite on port 5173.
-- **Mobile** (`apps/mobile`, Expo SDK 57): Vagas, lot detail and Relatórios, running in Expo Go.
+- **Mobile** (`apps/mobile`, Expo SDK 58): Vagas, lot detail and Relatórios, running in Expo Go.
   The phone talks to the API directly, so expose the API on the LAN (`API_BIND=0.0.0.0`) and
   start Expo with `EXPO_PUBLIC_API_BASE_URL=http://<LAN-IP>:8000 make mobile-start`. The steps,
   including the firewall, are in [docs/running.md](docs/running.md#expo-go-on-a-phone-lan).
@@ -178,7 +178,7 @@ A real gate integration would replace the generator and use the same endpoint an
   Prometheus client
 - Data: Postgres 17 · dbt-postgres · Parquet
 - Generator: Python 3.12 · httpx · Pydantic models generated with datamodel-code-generator
-- Clients: TypeScript · React 19 · Vite · React Router · TanStack Query · ECharts · Expo SDK 57
+- Clients: TypeScript · React 19 · Vite · React Router · TanStack Query · ECharts · Expo SDK 58
   (React Native, Expo Router) · openapi-typescript
 - Quality: uv · ruff · mypy · pytest · Hypothesis · ESLint · Vitest · Jest
 - Delivery: Docker Compose · nginx · GitHub Actions · Dependabot · D2

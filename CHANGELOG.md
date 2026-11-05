@@ -36,7 +36,7 @@ The 2026 rebuild of the course project into a parking-availability data system. 
   `run`, with demand patterns, holidays and injected faults.
 - Clients: npm workspace with `packages/api-client` (types generated from `backend/openapi.json`,
   a shared live-availability client, React Query keys), `apps/web` (React + Vite: Vagas, lot
-  detail, Relatórios, Operador) and `apps/mobile` (Expo SDK 57 for Expo Go: Vagas, lot detail,
+  detail, Relatórios, Operador) and `apps/mobile` (Expo SDK 58 for Expo Go: Vagas, lot detail,
   Relatórios), both with the UNDB visual identity and the unofficial-project notice.
 - Docker: multi-stage non-root images for the backend, generator and web (nginx); `compose.yaml`
   with postgres, migrate, api, worker, generator and web; `make demo` and `make smoke`.
@@ -56,6 +56,9 @@ The 2026 rebuild of the course project into a parking-availability data system. 
 - Free spaces come from an incremental counter instead of re-reading and re-pairing every event
   on each request.
 - Python 3.12 with uv, ruff and mypy strict replaced `requirements.txt`.
+- The mobile app moved from Expo SDK 57 to SDK 58: React Native 0.88.1, React 19.3.0 across the
+  npm workspace, Jest 30. The npm audit allowlist is empty again, since both Expo advisories
+  (zod 3 in the Expo CLI, decode-uri-component in expo-router) left the dependency tree.
 
 ### Removed
 
