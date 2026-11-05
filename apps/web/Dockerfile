@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 # The web app behind nginx, which also proxies /api (REST and the live WebSocket) to the API.
 # Build context: the repository root (npm workspace and its lockfile): docker build -f apps/web/Dockerfile .
-FROM node:24.22.1-alpine@sha256:06d7adf3e0ef61a13f1d28682726366f97a15aa1888c934d3ecec86c33918b53 AS build
+FROM node:24.22.2-alpine@sha256:8a32c8cf649a49915a66e81e7a609223c708d0adabf288ee3f4077d765542f85 AS build
 WORKDIR /src
 # Every workspace manifest, so npm ci installs exactly what package-lock.json pins.
 COPY package.json package-lock.json tsconfig.base.json ./
